@@ -10,28 +10,38 @@ module module_gas_composition
   implicit none
 
   private
+
+  character(100),parameter :: moduleName = 'module_gas_composition.f90'
   
   type, public :: gas
      ! fluid
-     real(kind=8) :: v(3)      ! gas velocity [cm/s]
-     ! define n scatterers 
-     integer(kind=4) :: nscatterer
-     type(scatterer),allocatable :: scatterer(:)           ! atomic properties of each scatterer
+     real(kind=8)                :: v(3)                   ! gas velocity [cm/s]
      real(kind=8),allocatable    :: number_density(:)      ! number density of each scatterer [cm^-3]
-     real(kind=8),allocatable    :: velocity_dispersion(:) ! velocity dispersion of each scatterer in cell frame [cm/s]
+     real(kind=8)                :: vth_sq_times_m         ! 2 kb T / amu  , dopwidth = sqrt(vth_sq_times_m / m_ion + vturb**2)
      ! DUST -> model of Laursen, Sommer-Larsen and Andersen 2009.
      ! ->  ndust = (nHI + f_ion nHII)*Z/Zref
      ! f_ion and Zref are two free parameters . 
-     real(kind=8) :: ndust     ! pseudo-numerical density of dust particles [#/cm3]
+     real(kind=8)                :: ndust                  ! pseudo-numerical density of dust particles [#/cm3]
   end type gas
-  real(kind=8),public :: box_size_cm   ! size of simulation box in cm. 
+  real(kind=8),public         :: box_size_cm     ! size of simulation box in cm.
+  
+  type(scatterer),allocatable :: scatterer_list(:)    ! List of scatterers, defined from scatterer_list (below)
+  logical                     :: HI_present = .false. ! Flag that informs the code whether the run contains HI, which is read differently than metallic ions.
+  logical                     :: D_present  = .false.
+  integer(kind=4)             :: metal_number         ! Number of metallic ions, equal to nscatterer if no HI and scatterer-1 if there is HI
   
   ! --------------------------------------------------------------------------
   ! user-defined parameters - read from section [gas_composition] of the parameter file
   ! --------------------------------------------------------------------------
-  ! mixture parameters 
-  real(kind=8)             :: f_ion           = 0.01   ! ndust = (n_HI + f_ion*n_HII) * Z/Zsun [Laursen+09]
-  real(kind=8)             :: Zref            = 0.005  ! reference metallicity. Should be ~ 0.005 for SMC and ~ 0.01 for LMC. 
+  ! mixture parameters
+  integer(kind=4)             :: nscatterer                              ! Number of scatterers in the run
+  character(100),allocatable  :: scatterer_names(:)                      ! List of names of scatterer (i.e. lines)  ! Follow nomenclature of the tuto
+  character(1000)             :: atomic_data_dir = '../ions_parameters/' ! directory where the atomic data files are (usually in .../rascas/ions_parameters/)
+  character(2000)             :: krome_data_dir                          ! directory where the density of metallic ions are, from the Krome runs
+  real(kind=8)                :: f_ion           = 0.01                  ! ndust = (n_HI + f_ion*n_HII) * Z/Zsun [Laursen+09]
+  real(kind=8)                :: Zref            = 0.005                 ! reference metallicity. Should be ~ 0.005 for SMC and ~ 0.01 for LMC.
+  real(kind=8)                :: vturb           = 2d1                   ! Constant turbulent velocity accross the simulation,  in km/s
+  
   ! possibility to overwrite ramses values with an ad-hoc model 
   logical                  :: gas_overwrite       = .false. ! if true, define cell values from following parameters 
   real(kind=8)             :: fix_nhi             = 0.0d0   ! ad-hoc HI density (H/cm3)
@@ -41,52 +51,88 @@ module module_gas_composition
   real(kind=8)             :: fix_box_size_cm     = 1.0d8   ! ad-hoc box size in cm. 
   ! --------------------------------------------------------------------------
 
+
   ! public functions:
   public :: gas_from_ramses_leaves,get_gas_velocity,gas_get_scatter_flag,gas_scatter,dump_gas
   public :: read_gas,gas_destructor,read_gas_composition_params,print_gas_composition_params
+  public :: get_metal_ion_names
+
   !--PEEL--
   public :: gas_peeloff_weight,gas_get_tau
   !--LEEP--
+  public :: nscatterer, metal_number, krome_data_dir
   
 contains
 
   
-  subroutine gas_from_ramses_leaves(repository,snapnum,nleaf,nvar,ramses_var, g)
+  subroutine gas_from_ramses_leaves(repository,snapnum,nleaf,nvar,ramses_var,g) 
 
     ! define gas contents from ramses raw data
 
     use module_ramses
     
-    character(2000),intent(in)                     :: repository 
-    integer(kind=4),intent(in)                     :: snapnum
-    integer(kind=4),intent(in)                     :: nleaf,nvar
-    real(kind=8),intent(in),dimension(nvar,nleaf)  :: ramses_var
-    type(gas),dimension(:),allocatable,intent(out) :: g
-    integer(kind=4)                                :: ileaf
-    real(kind=8),dimension(:),allocatable          :: T, nhi, metallicity, nhii
-    real(kind=8),dimension(:,:),allocatable        :: v
+    character(2000),intent(in)                                  :: repository 
+    integer(kind=4),intent(in)                                  :: snapnum
+    integer(kind=4),intent(in)                                  :: nleaf,nvar
+    real(kind=8),intent(in),dimension(nvar+metal_number,nleaf)  :: ramses_var
+    type(gas),dimension(:),allocatable,intent(out)              :: g
+    integer(kind=4)                                             :: ileaf, i
+    real(kind=8),dimension(:),allocatable                       :: T, nhi, metallicity, nhii
+    real(kind=8),dimension(:,:),allocatable                     :: v
 
     ! allocate gas-element array
     allocate(g(nleaf))
 
-    if (gas_overwrite) then
-       call overwrite_gas(g)
-    else
-       
-       box_size_cm = ramses_get_box_size_cm(repository,snapnum)
+    ! if (gas_overwrite) then
+    !    call overwrite_gas(g)
+    ! else
 
-       ! compute velocities in cm / s
-       write(*,*) '-- module_gas_composition_HI_D_dust : extracting velocities from ramses '
-       allocate(v(3,nleaf))
-       call ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar,ramses_var,v)
-       do ileaf = 1,nleaf
-          g(ileaf)%v = v(:,ileaf)
+    ! Allocate the density variable
+    do ileaf=1,nleaf
+       allocate(g(ileaf)%number_density(nscatterer))
+    end do
+
+
+    box_size_cm = ramses_get_box_size_cm(repository,snapnum)
+
+    ! compute velocities in cm / s
+    write(*,*) '-- module_gas_composition : extracting velocities from ramses '
+    allocate(v(3,nleaf))
+    call ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar,ramses_var,v)
+    do ileaf = 1,nleaf
+       g(ileaf)%v = v(:,ileaf)
+    end do
+    deallocate(v)
+
+    ! get nHI and temperature from ramses
+    write(*,*) '-- module_gas_composition : extracting nHI and T from ramses '
+    allocate(T(nleaf),nhi(nleaf))
+    call ramses_get_T_nhi_cgs(repository,snapnum,nleaf,nvar,ramses_var,T,nhi)
+
+    ! get ndust (pseudo dust density from Laursen, Sommer-Larsen, Andersen 2009)
+    write(*,*) '-- module_gas_composition : extracting ndust from ramses '
+    allocate(metallicity(nleaf),nhii(nleaf))
+    call ramses_get_metallicity(nleaf,nvar,ramses_var,metallicity)
+    call ramses_get_nh_cgs(repository,snapnum,nleaf,nvar,ramses_var,nhii)
+    nhii = nhii - nhi
+    do ileaf = 1,nleaf
+       g(ileaf)%ndust = metallicity(ileaf) / Zref * ( nhi(ileaf) + f_ion*nhii(ileaf) )   ! [ /cm3 ]
+    end do
+
+    do ileaf = 1,nleaf
+       do i=1,nscatterer
+          if(scatterer_list(i)%name_ion == 'HI') then
+             g(ileaf)%number_density(i) = nhi(ileaf)
+          else
+             g(ileaf)%number_density(i) = ramses_var(nvar+i,ileaf)
+          end if
        end do
-       deallocate(v)
+    end do
 
-       ! define properties of scatterers... 
-       
-    end if
+    ! compute thermal velocity 
+    g(:)%vth_sq_times_m = 2d0*kb*T / amu
+
+    ! end if
 
     return
 
@@ -94,20 +140,20 @@ contains
 
 
   
-  subroutine overwrite_gas(g)
-    ! overwrite ramses values with an ad-hoc model
+  ! subroutine overwrite_gas(g)
+  !   ! overwrite ramses values with an ad-hoc model
 
-    type(gas),dimension(:),intent(inout) :: g
+  !   type(gas),dimension(:),intent(inout) :: g
 
-    box_size_cm   = fix_box_size_cm
-    
-    g(:)%v(1)     = fix_vel
-    g(:)%v(2)     = fix_vel
-    g(:)%v(3)     = fix_vel
-    ! faire gaffe ... 
-    g(:)%ndust    = fix_ndust
-    
-  end subroutine overwrite_gas
+  !   box_size_cm   = fix_box_size_cm
+
+  !   g(:)%v(1)     = fix_vel
+  !   g(:)%v(2)     = fix_vel
+  !   g(:)%v(3)     = fix_vel
+  !   ! faire gaffe ... 
+  !   g(:)%ndust    = fix_ndust
+
+  ! end subroutine overwrite_gas
 
 
   function get_gas_velocity(cell_gas)
@@ -126,7 +172,7 @@ contains
     ! Decide whether a scattering event occurs, and if so, on which element
     ! --------------------------------------------------------------------------
     ! INPUTS:
-    ! - cell_gas : a mix of H, D, and dust
+    ! - cell_gas : a mix of ions and dust
     ! - distance_to_border_cm : the maximum distance the photon may travel (before leaving the cell)
     ! - nu_cell : photon frequency in cell's frame [ Hz ]
     ! - tau_abs : optical depth at which the next scattering event will occur
@@ -135,7 +181,7 @@ contains
     ! OUTPUTS:
     ! - distance_to_border_cm : comes out as the distance to scattering event (if there is an event)
     ! - tau_abs : 0 if a scatter occurs, decremented by tau_cell if photon escapes cell. 
-    ! - gas_get_scatter_flag : 0 [no scatter], 1 [H scatter], 2 [D scatter], 3 [dust]
+    ! - gas_get_scatter_flag : 0 [no scatter], 1 [dust], 2<->nscatterer+1 [scatterer]
     ! - CS_xcrit: critical frequency above which core-skipping applies. For Core-Skipping only.
     ! --------------------------------------------------------------------------
 
@@ -145,8 +191,8 @@ contains
     real(kind=8),intent(in)               :: nu_cell
     real(kind=8),intent(inout)            :: tau_abs                ! tau at which scattering is set to occur.
     integer(kind=4),intent(inout)         :: iran
-    integer(kind=4)                       :: gas_get_scatter_flag 
-    real(kind=8)                          :: tau_HI, tau_dust, tau_cell, tau_D, tirage, proba1, proba2
+    integer(kind=4)                       :: gas_get_scatter_flag, i, iHI_1216 ! To move
+    real(kind=8)                          :: tau_ions(nscatterer), tau_dust, tau_cell, tau, tirage
     !--CORESKIP--
     real(kind=8),intent(in)               :: CS_dist_cm
     real(kind=8),intent(inout)            :: CS_xcrit
@@ -155,12 +201,13 @@ contains
     
     ! compute optical depths for different components of the gas.
     tau_cell = 0.0d0 
-    do i = 1, cell_gas%nscatterer
-       tau(i) = get_tau(cell_gas%number_density(i),cell_gas%velocity_dispersion(i), distance_to_border_cm, nu_cell, cell_gas%scatterer(i))
-       tau_cell = tau_cell + tau(i) 
+    do i = 1, nscatterer
+       tau_ions(i) = get_tau(cell_gas%number_density(i),cell_gas%vth_sq_times_m, vturb, distance_to_border_cm, nu_cell, scatterer_list(i))
+       tau_cell = tau_cell + tau_ions(i) 
     end do
     tau_dust = get_tau_dust(cell_gas%ndust, distance_to_border_cm, nu_cell)
-    tau_cell = tau_dust
+    tau_cell = tau_cell + tau_dust
+    
 
     if (tau_abs > tau_cell) then  ! photon is due for absorption outside the cell 
        gas_get_scatter_flag = 0   ! no scatter
@@ -169,38 +216,44 @@ contains
           print*, 'tau_abs est negatif'
           stop
        endif
-    else  ! the scattering happens inside the cell. 
-       ! decide whether scattering is due to HI, D or dust
-       proba1 = tau_HI / tau_cell         
-       proba2 = proba1 + tau_D / tau_cell
+    else  ! the scattering happens inside the cell.
        tirage = ran3(iran)
-       if(tirage <= proba1)then
-          gas_get_scatter_flag = 1 ! HI scatter
-       else if (tirage <= proba2) then 
-          gas_get_scatter_flag = 2 ! interaction with a Deuterium atom 
-       else 
-          gas_get_scatter_flag = 3 ! interaction with dust
-       endif
-       ! and transform "distance_to_border_cm" in "distance_to_absorption_cm"
+       if(tirage < tau_dust/tau_cell) then
+          gas_get_scatter_flag = 1            !nAbsorption by dust
+       else
+          tau = tau_dust
+          ! Loop to find the scatterer
+          do i=1,nscatterer
+             tau = tau + tau_ions(i)
+             if(tirage < tau/tau_cell) then
+                gas_get_scatter_flag = i+1
+                exit
+             end if
+          end do
+       end if
+
        distance_to_border_cm = distance_to_border_cm * (tau_abs / tau_cell)
     end if
 
-    CS_xcrit = 0.0d0
-    if (core_skip) then
-       delta_nu_doppler = cell_gas%dopwidth/lambda_0_cm
-       a = gamma_over_fourpi/delta_nu_doppler
-       xcw = 6.9184721d0 + 81.766279d0 / (log10(a)-14.651253d0)  ! Smith+15, Eq. 21
-       x = (nu_cell - nu_0)/delta_nu_doppler
-       if (abs(x) < xcw) then ! apply core-skipping
-          CS_tau_cell = get_tau_HI_1216(cell_gas%nHI, cell_gas%dopwidth, CS_dist_cm, nu_cell)
-          CS_tau_cell = CS_tau_cell + get_tau_D_1215(cell_gas%nHI * deut2H_nb_ratio, cell_gas%dopwidth * sqrt_H2Deut_mass_ratio, CS_dist_cm, nu_cell)
-          CS_tau_cell = CS_tau_cell +get_tau_dust(cell_gas%ndust, CS_dist_cm, nu_cell)
-          CS_tau_cell = CS_tau_cell * a
-          if (CS_tau_cell > 1.0d0) CS_xcrit = CS_tau_cell**(1./3.)/5.  ! Smith+15, Eq. 35
+
+    if(gas_get_scatter_flag>1) then
+       CS_xcrit = 0.0d0
+       if (scatterer_list(gas_get_scatter_flag-1)%core_skip .eqv. .true. .and. scatterer_list(gas_get_scatter_flag-1)%name_ion == 'HI') then
+          delta_nu_doppler = sqrt(cell_gas%vth_sq_times_m + vturb**2*1d10) / scatterer_list(gas_get_scatter_flag-1)%lambda_cm 
+          a = scatterer_list(gas_get_scatter_flag-1)%A_over_fourpi/delta_nu_doppler
+          xcw = 6.9184721d0 + 81.766279d0 / (log10(a)-14.651253d0)  ! Smith+15, Eq. 21
+          x = (nu_cell - scatterer_list(gas_get_scatter_flag-1)%nu)/delta_nu_doppler
+          if (abs(x) < xcw) then ! apply core-skipping
+             CS_tau_cell = get_tau(cell_gas%number_density(gas_get_scatter_flag-1), cell_gas%vth_sq_times_m, vturb, CS_dist_cm, nu_cell, scatterer_list(gas_get_scatter_flag-1))
+             ! We can use only tau_HI_1216
+             !CS_tau_cell = CS_tau_cell + get_tau_dust(cell_gas%ndust, CS_dist_cm, nu_cell)
+             CS_tau_cell = CS_tau_cell * a
+             if (CS_tau_cell > 1.0d0) CS_xcrit = CS_tau_cell**(1./3.)/5.  ! Smith+15, Eq. 35
+          end if
        end if
     end if
-    
-    
+
+
     return
   end function gas_get_scatter_flag
 
@@ -208,7 +261,6 @@ contains
 
   !--CORESKIP-- 
   subroutine gas_scatter(flag,cell_gas,nu_cell,k,nu_ext,iran,xcrit)
-  !subroutine gas_scatter(flag,cell_gas,nu_cell,k,nu_ext,iran)
   !--PIKSEROC--
     
     integer(kind=4),intent(inout)            :: flag
@@ -221,18 +273,13 @@ contains
     !--PIKSEROC--
     integer(kind=4)                          :: ilost
 
-    select case(flag)
-    case(1)
-       !--CORESKIP--
-       call scatter(cell_gas%v, cell_gas%dopwidth, nu_cell, k, nu_ext, iran, xcrit)
-       !call scatter_HI_1216(cell_gas%v, cell_gas%dopwidth, nu_cell, k, nu_ext, iran)
-       !--PIKSEROC--
-    case(2)
-       call scatter_D_1215(cell_gas%v,cell_gas%dopwidth*sqrt_H2Deut_mass_ratio, nu_cell, k, nu_ext, iran)
-    case(3)
+    if(flag==1) then
        call scatter_dust(cell_gas%v, nu_cell, k, nu_ext, iran, ilost)
        if(ilost==1)flag=-1
-    end select
+    else
+       call scatter(cell_gas%v, cell_gas%vth_sq_times_m, vturb, nu_cell, k, nu_ext, iran, xcrit, scatterer_list(flag-1))
+    end if
+
 
   end subroutine gas_scatter
 
@@ -245,7 +292,7 @@ contains
     ! compute total opacity of gas accross distance_cm at freq. nu_cell
     ! --------------------------------------------------------------------------
     ! INPUTS:
-    ! - cell_gas : a mix of H, D, and dust
+    ! - cell_gas : a mix of scatterers and dust
     ! - distance_cm : the distance along which to compute tau [cm]
     ! - nu_cell : photon frequency in cell's frame [ Hz ]
     ! OUTPUTS:
@@ -257,13 +304,15 @@ contains
     real(kind=8),intent(in) :: distance_cm
     real(kind=8),intent(in) :: nu_cell
     real(kind=8)            :: gas_get_tau
-    real(kind=8)            :: tau_HI, tau_dust, tau_D
+    integer(kind=4)         :: i
 
     ! compute optical depths for different components of the gas.
-    tau_HI   = get_tau_HI_1216(cell_gas%nHI, cell_gas%dopwidth, distance_cm, nu_cell)
-    tau_dust = get_tau_dust(cell_gas%ndust, distance_cm, nu_cell)
-    tau_D    = get_tau_D_1215(cell_gas%nHI * deut2H_nb_ratio, cell_gas%dopwidth * sqrt_H2Deut_mass_ratio,distance_cm, nu_cell)
-    gas_get_tau = tau_HI + tau_D + tau_dust
+    gas_get_tau = 0d0
+    do i = 1, nscatterer
+       gas_get_tau = gas_get_tau + get_tau(cell_gas%number_density(i) ,cell_gas%vth_sq_times_m, vturb, distance_cm, nu_cell, scatterer_list(i))
+    end do
+
+    gas_get_tau = gas_get_tau + get_tau_dust(cell_gas%ndust, distance_cm, nu_cell)
 
     return
     
@@ -280,17 +329,11 @@ contains
     integer(kind=4),intent(inout)         :: iran
     real(kind=8)                          :: gas_peeloff_weight
 
-    select case(flag)
-    case(1)
-       gas_peeloff_weight = HI_1216_peeloff_weight(cell_gas%v, cell_gas%dopwidth, nu_ext, kin, kout, iran)
-    case(2)
-       gas_peeloff_weight = D_1215_peeloff_weight(cell_gas%v, cell_gas%dopwidth*sqrt_H2Deut_mass_ratio, nu_ext, kin, kout, iran)
-    case(3)
+    if(flag==1) then
        gas_peeloff_weight = dust_peeloff_weight(cell_gas%v, nu_ext, kin, kout)
-    case default
-       print*,'ERROR in module_gas_composition_HI_D_dust.f90:gas_peeloff_weight - unknown case : ',flag 
-       stop
-    end select
+    else
+       gas_peeloff_weight = peeloff_weight(cell_gas%v, cell_gas%vth_sq_times_m, vturb, nu_ext, kin, kout, iran, scatterer_list(flag-1))
+    end if
 
   end function gas_peeloff_weight
   !--LEEP--
@@ -300,39 +343,63 @@ contains
   subroutine dump_gas(unit,g)
     type(gas),dimension(:),intent(in) :: g
     integer(kind=4),intent(in)        :: unit
-    integer(kind=4)                   :: i,nleaf
+    integer(kind=4)                   :: i,j,nleaf
+    
     nleaf = size(g)
+    
     write(unit) (g(i)%v(:), i=1,nleaf)
-    write(unit) (g(i)%nHI, i=1,nleaf)
-    write(unit) (g(i)%dopwidth, i=1,nleaf)
+    do i=1,nscatterer
+       write(unit) (g(j)%number_density(i), j=1,nleaf)
+    end do
+    write(unit) (g(i)%vth_sq_times_m, i=1,nleaf)
     write(unit) (g(i)%ndust, i=1,nleaf)
     write(unit) box_size_cm
   end subroutine dump_gas
 
 
-
   subroutine read_gas(unit,n,g)
     integer(kind=4),intent(in)                     :: unit,n
     type(gas),dimension(:),allocatable,intent(out) :: g
-    integer(kind=4)                                :: i
+    integer(kind=4)                                :: i,j
     allocate(g(1:n))
-    if (gas_overwrite) then
-       call overwrite_gas(g)
-    else
-       read(unit) (g(i)%v(:),i=1,n)
-       read(unit) (g(i)%nHI,i=1,n)
-       read(unit) (g(i)%dopwidth,i=1,n)
-       read(unit) (g(i)%ndust,i=1,n)
-       read(unit) box_size_cm
-    end if
+    !if (gas_overwrite) then
+    !  call overwrite_gas(g)
+    ! else
+    read(unit) (g(i)%v(:),i=1,n)
+    do j=1,nscatterer
+       read(unit) (g(i)%number_density(j), i=1,n)
+    end do
+    read(unit) (g(i)%vth_sq_times_m, i=1,n)
+    read(unit) (g(i)%ndust,i=1,n)
+    read(unit) box_size_cm
+    ! end if
   end subroutine read_gas
 
 
-  
   subroutine gas_destructor(g)
     type(gas),dimension(:),allocatable,intent(inout) :: g
     deallocate(g)
   end subroutine gas_destructor
+
+
+  subroutine get_metal_ion_names(metal_ion_names)
+
+    implicit none
+
+    character(10),allocatable, intent(inout) :: metal_ion_names(:)
+    integer(kind=4)                          :: i, j
+
+    allocate(metal_ion_names(metal_number))
+
+    j=1
+    do i=1,nscatterer
+       if(scatterer_list(i)%name_ion /= 'HI') then
+          metal_ion_names(j) = scatterer_list(i)%name_ion
+          j=j+1
+       end if
+    end do
+
+  end subroutine get_metal_ion_names
 
 
 
@@ -374,37 +441,57 @@ contains
           i = scan(value,'!')
           if (i /= 0) value = trim(adjustl(value(:i-1)))
           select case (trim(name))
-          case ('deut2H_nb_ratio')
-             read(value,*) deut2H_nb_ratio
+          case ('nscatterer')
+             read(value,*) nscatterer
+             allocate(scatterer_names(nscatterer), scatterer_list(nscatterer))
+          case ('scatterer_names')
+             read(value,*) scatterer_names(:)
+          case ('atomic_data_dir')
+             write(atomic_data_dir,'(a)') trim(value)
+          case ('krome_data_dir')
+             write(krome_data_dir,'(a)') trim(value)
           case ('f_ion')
              read(value,*) f_ion
           case ('Zref')
              read(value,*) Zref
-          case ('gas_overwrite')
-             read(value,*) gas_overwrite
-          case ('fix_nhi')
-             read(value,*) fix_nhi
-          case ('fix_vth')
-             read(value,*) fix_vth
-          case ('fix_ndust')
-             read(value,*) fix_ndust
-          case ('fix_vel')
-             read(value,*) fix_vel
-          case ('fix_box_size_cm')
-             read(value,*) fix_box_size_cm
+          case ('vturb')
+             read(value,*) vturb
+          ! case ('gas_overwrite')
+          !    read(value,*) gas_overwrite
+          ! case ('fix_nhi')
+             !    read(value,*) fix_nhi
+             ! case ('fix_vth')
+             !    read(value,*) fix_vth
+             ! case ('fix_ndust')
+             !    read(value,*) fix_ndust
+             ! case ('fix_vel')
+             !    read(value,*) fix_vel
+             ! case ('fix_box_size_cm')
+             !    read(value,*) fix_box_size_cm
           end select
        end do
     end if
     close(10)
 
-    call read_HI_1216_params(pfile)
-    call read_D_1215_params(pfile)
-    call read_dust_params(pfile)
+    ! Reading the name of the scatterers, and determining whether HI is present
+    do i=1,nscatterer
+       call read_scatterer_params(trim(atomic_data_dir)//'/'//trim(scatterer_names(i))//'.dat', scatterer_list(i), i)
+       if(scatterer_names(i) == 'HI-1216') HI_present = .true.
+    end do
+
+    ! Defining metal_number
+    if(HI_present) then
+       metal_number = nscatterer-1
+    else
+       metal_number = nscatterer
+    end if
+
     
+    call read_dust_params(pfile)
+
     return
 
   end subroutine read_gas_composition_params
-
 
 
   subroutine print_gas_composition_params(unit)
@@ -415,49 +502,56 @@ contains
     ! ---------------------------------------------------------------------------------
 
     integer(kind=4),optional,intent(in) :: unit
-
+    integer(kind=4)                     :: i
+             
     if (present(unit)) then 
        write(unit,'(a,a,a)') '[gas_composition]'
        write(unit,'(a,a)')      '# code compiled with: ',trim(moduleName)
        write(unit,'(a)')        '# mixture parameters'
-       write(unit,'(a,ES10.3)') '  deut2H_nb_ratio = ',deut2H_nb_ratio
+       !write(unit,'(a,ES10.3)') '  deut2H_nb_ratio = ',deut2H_nb_ratio
+       write(unit,'(a,i2)')     '  nscatterer      = ',nscatterer
+       do i=1,nscatterer
+          write(unit,'(a,i2,a,a)')'  scatterer ',i,' = ',scatterer_names(i)
+       end do
+       write(unit,'(a,a)')      '  atomic_data_dir = ',atomic_data_dir
+       write(unit,'(a,a)')      '  krome_data_dir  = ',krome_data_dir
        write(unit,'(a,ES10.3)') '  f_ion           = ',f_ion
        write(unit,'(a,ES10.3)') '  Zref            = ',Zref
-       write(unit,'(a)')        '# overwrite parameters'
-       write(unit,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
-       if(gas_overwrite)then
-          write(unit,'(a,ES10.3)') '  fix_nhi         = ',fix_nhi
-          write(unit,'(a,ES10.3)') '  fix_vth         = ',fix_vth
-          write(unit,'(a,ES10.3)') '  fix_ndust       = ',fix_ndust
-          write(unit,'(a,ES10.3)') '  fix_vel         = ',fix_vel
-          write(unit,'(a,ES10.3)') '  fix_box_size_cm = ',fix_box_size_cm
-       endif
-       write(unit,'(a)')             ' '
-       call print_HI_1216_params(unit)
-       write(unit,'(a)')             ' '
-       call print_D_1215_params(unit)
+       write(unit,'(a,ES10.3)') '  vturb           = ',vturb
+       ! write(unit,'(a)')        '# overwrite parameters'
+       ! write(unit,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
+       ! if(gas_overwrite)then
+       !    write(unit,'(a,ES10.3)') '  fix_nhi         = ',fix_nhi
+       !    write(unit,'(a,ES10.3)') '  fix_vth         = ',fix_vth
+       !    write(unit,'(a,ES10.3)') '  fix_ndust       = ',fix_ndust
+       !    write(unit,'(a,ES10.3)') '  fix_vel         = ',fix_vel
+       !    write(unit,'(a,ES10.3)') '  fix_box_size_cm = ',fix_box_size_cm
+       ! endif
        write(unit,'(a)')             ' '
        call print_dust_params(unit)
     else
        write(*,'(a,a,a)') '[gas_composition]'
        write(*,'(a,a)')      '# code compiled with: ',trim(moduleName)
        write(*,'(a)')        '# mixture parameters'
-       write(*,'(a,ES10.3)') '  deut2H_nb_ratio = ',deut2H_nb_ratio
+       !write(*,'(a,ES10.3)') '  deut2H_nb_ratio = ',deut2H_nb_ratio
+       write(*,'(a,i2)')     '  nscatterer      = ',nscatterer
+       do i=1,nscatterer
+          write(*,'(a,i2,a,a)')'  scatterer ',i,' = ',scatterer_names(i)
+       end do
+       write(*,'(a,a)')      '  atomic_data_dir = ',atomic_data_dir
+       write(*,'(a,a)')      '  krome_data_dir  = ',krome_data_dir
        write(*,'(a,ES10.3)') '  f_ion           = ',f_ion
        write(*,'(a,ES10.3)') '  Zref            = ',Zref
-       write(*,'(a)')        '# overwrite parameters'
-       write(*,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
-       if(gas_overwrite)then
-          write(*,'(a,ES10.3)') '  fix_nhi         = ',fix_nhi
-          write(*,'(a,ES10.3)') '  fix_vth         = ',fix_vth
-          write(*,'(a,ES10.3)') '  fix_ndust       = ',fix_ndust
-          write(*,'(a,ES10.3)') '  fix_vel         = ',fix_vel
-          write(*,'(a,ES10.3)') '  fix_box_size_cm = ',fix_box_size_cm
-       endif
-       write(*,'(a)')             ' '
-       call print_HI_1216_params
-       write(*,'(a)')             ' '
-       call print_D_1215_params
+       write(*,'(a,ES10.3)') '  vturb           = ',vturb
+       ! write(*,'(a)')        '# overwrite parameters'
+       ! write(*,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
+       ! if(gas_overwrite)then
+       !    write(*,'(a,ES10.3)') '  fix_nhi         = ',fix_nhi
+       !    write(*,'(a,ES10.3)') '  fix_vth         = ',fix_vth
+       !    write(*,'(a,ES10.3)') '  fix_ndust       = ',fix_ndust
+       !    write(*,'(a,ES10.3)') '  fix_vel         = ',fix_vel
+       !    write(*,'(a,ES10.3)') '  fix_box_size_cm = ',fix_box_size_cm
+       ! endif
        write(*,'(a)')             ' '
        call print_dust_params
     end if

@@ -1,11 +1,11 @@
 #############################################################################
 # Fortran compiler options and directives
 
-SYSTYPE="CCF"
+#SYSTYPE="CCF"
 #SYSTYPE="lyocral"
 #SYSTYPE="lyocralP"
 #SYSTYPE="mac"
-#SYSTYPE="macP"
+SYSTYPE="macP"
 #SYSTYPE="ccage"
 #SYSTYPE="horizon"
 
@@ -51,8 +51,8 @@ endif
 
 
 ifeq ($(SYSTYPE),"macP")
-F90         = mpif90-openmpi-gcc8
-FFLAGS      = -g -fcheck=all -ffree-line-length-none -ffree-form -ftrapv -fbounds-check -fbacktrace -Wall
+F90         = mpif90 #-openmpi-gcc8
+FFLAGS      = -g -ffree-line-length-none -fbounds-check -fbacktrace #-fcheck=all -Wall -ftrapv -ffree-form
 #FFLAGS      = -O3
 FFLAGS += $(OPTIONS)
 LDFLAGS     = #-lmpi
@@ -81,7 +81,7 @@ endif
 
 # choose the gas mix you want to use
 # 1/ HI, D, and dust
-COMPOBJS = module_dust_model.o module_D_1215_model.o module_HI_1216_model.o module_gas_composition_HI_D_dust.o
+#COMPOBJS = module_dust_model.o module_D_1215_model.o module_HI_1216_model.o module_gas_composition_HI_D_dust.o
 # 2/ HI and dust
 #COMPOBJS = module_dust_model.o module_HI_1216_model.o module_gas_composition_HI_dust.o
 # 3/ pure HI
@@ -108,6 +108,8 @@ COMPOBJS = module_dust_model.o module_D_1215_model.o module_HI_1216_model.o modu
 #COMPOBJS = module_dust_model.o module_gas_composition_dust.o
 # 14/ HI, HeI, HeII -> WARNING, this is for fesc measurements only ! 
 #COMPOBJS = module_gas_composition_HI_HeI_HeII.o
+COMPOBJS = module_dust_model.o module_scatterer_model.o module_gas_composition.o
+
 
 GASOBJS = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o $(COMPOBJS)
 
@@ -131,7 +133,7 @@ OBJFESC	= $(GASOBJS) module_mesh.o module_gray_ray.o
 	$(F90) $(FFLAGS) -c $^ -o $@
 
 #############################################################################
-all: clean CreateDomDump PhotonsFromSourceModel PhotonsFromStars rascas-serial
+all: clean CreateDomDump PhotonsFromSourceModel PhotonsFromStars rascas
 
 PhotonsFromSourceModel: $(OBJSPHO) PhotonsFromSourceModel.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) PhotonsFromSourceModel.o

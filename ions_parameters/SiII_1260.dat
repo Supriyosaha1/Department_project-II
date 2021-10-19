@@ -1,0 +1,11 @@
+! SiII - 1260.42 line
+! Parameters taken from https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+
+m_ion          = 28.0855d0
+name_ion       = SiII
+lambda_cm      = 1.26042d-5                   
+A              = 2.57d9                              
+f              = 1.22d0               
+n_fluo         = 1
+lambda_fluo_cm = 1.26502d-5
+A_fluo         = 4.73d8
