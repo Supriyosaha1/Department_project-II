@@ -9,6 +9,10 @@ module module_photon
   !--PEEL--
   use module_mock
   !--LEEP--
+  !--FILTER-- 
+  use module_filter
+  !--RETLIF-- 
+
   
   implicit none
 
@@ -596,11 +600,16 @@ contains
           end if
           ! if tau is not absurdly large, increment detectors 
           if (tau < tau_max) then
-             peel_contrib = PeelBuffer(ipeel)%weight * exp(-tau) * 2.0d0 
+             peel_contrib = PeelBuffer(ipeel)%weight * exp(-tau) * 2.0d0
              if (increment_flux)  call peel_to_flux(peel_contrib,idir) 
              if (increment_spec)  call peel_to_spec(PeelBuffer(ipeel)%nu,peel_contrib,idir)
-             if (increment_image) call peel_to_map(projpos,peel_contrib,idir)
              if (increment_cube)  call peel_to_cube(projpos,PeelBuffer(ipeel)%nu,peel_contrib,idir)
+             if (increment_image) then
+                !--FILTER--
+                if (use_filter) peel_contrib = peel_contrib * filter_response(PeelBuffer(ipeel)%nu)
+                !--RETLIF-- 
+                call peel_to_map(projpos,peel_contrib,idir)
+             end if
           end if
           PeelBuffer(ipeel)%nu = nupeel ! restore for next directions
        end do

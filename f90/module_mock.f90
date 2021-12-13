@@ -2,6 +2,10 @@
 module module_mock
 
   use module_constants, only:clight
+  !--FILTER--
+  use module_filter
+  !--RETLIF-- 
+
   
   private
 
@@ -381,6 +385,10 @@ contains
     end if
     close(10)
 
+    !--FILTER--
+    call read_filter_params(pfile)
+    !--RETLIF-- 
+    
     call mock_init
        
     return
