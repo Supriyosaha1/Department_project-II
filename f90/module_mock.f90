@@ -42,18 +42,20 @@ module module_mock
   integer(kind=4) :: nDirections = 0
   character(2000) :: mock_parameter_file
   character(2000) :: mock_outputfilename  ! Prefix for output files (including absolute path) -> will be followed by "_image.xxxxx" or "_spectrum.xxxxx", with xxxxx the cpu number.
-
+  !--FILTER--
+  logical         :: use_filter = .false. ! use a filter response curve when computing images. 
+  !--RETLIF--
 
   ! global parameter setting peeling-off on or off.
   logical         :: peeling_off
 
   
   ! public variables 
-  public :: peeling_off, nDirections, mock
+  public :: peeling_off, nDirections, mock, use_filter
 
   ! public functions 
   public :: read_mock_params, mock_line_of_sight, mock_point_in_spectral_aperture, mock_point_in_flux_aperture, mock_point_in_image, mock_point_in_cube
-  public :: mock_projected_pos, peel_to_flux, peel_to_map, peel_to_spec, peel_to_cube, dump_mocks
+  public :: mock_projected_pos, peel_to_flux, peel_to_map, peel_to_spec, peel_to_cube, dump_mocks, print_mock_params
   
 contains
   
@@ -364,13 +366,13 @@ contains
     ! read section if present
     if (section_present) then 
        do
-          read (10,'(a)',iostat=err) line
+          read (10,'(a)',iostat=err) line          
           if(err/=0) exit
           if (line(1:1) == '[') exit ! next section starting... -> leave
           i = scan(line,'=')
           if (i==0 .or. line(1:1)=='#' .or. line(1:1)=='!') cycle  ! skip blank or commented lines
           name=trim(adjustl(line(:i-1)))
-          value=trim(adjustl(line(i+1:)))
+          value=trim(adjustl(line(i+1:)))          
           i = scan(value,'!')
           if (i /= 0) value = trim(adjustl(value(:i-1)))
           select case (trim(name))
@@ -380,13 +382,15 @@ contains
              write(mock_parameter_file,'(a)') trim(value)
           case ('mock_outputfilename')
              write(mock_outputfilename,'(a)') trim(value)
+          case ('use_filter')
+             read(value,*) use_filter
           end select
        end do
     end if
     close(10)
 
     !--FILTER--
-    call read_filter_params(pfile)
+    if (use_filter) call read_filter_params(pfile)
     !--RETLIF-- 
     
     call mock_init
@@ -395,6 +399,44 @@ contains
 
   end subroutine read_mock_params
 
+  subroutine print_mock_params(unit)
+
+    ! ---------------------------------------------------------------------------------
+    ! write parameter values to std output or to an open file if argument unit is
+    ! present.
+    ! ---------------------------------------------------------------------------------
+
+    integer(kind=4),optional,intent(in) :: unit
+
+    if (present(unit)) then 
+       write(unit,'(a,a,a)')   '[mock]'
+       write(unit,'(a,i8)')    '  nDirections         = ',nDirections
+       write(unit,'(a,a)')     '  mock_parameter_file = ',trim(mock_parameter_file)
+       write(unit,'(a,a)')     '  mock_outputfilename = ',trim(mock_outputfilename)
+       write(unit,'(a,L1)')    '  use_filter          = ',use_filter
+       write(unit,'(a)')       ' '
+       !--FILTER--
+       if (use_filter) call print_filter_params(unit)
+       !--RETLIF--
+    else
+       write(*,'(a)')          '--------------------------------------------------------------------------------'
+       write(*,'(a)')          ' '
+       write(*,'(a,a,a)')      '[mock]'
+       write(*,'(a,i8)')       '  nDirections         = ',nDirections
+       write(*,'(a,a)')        '  mock_parameter_file = ',trim(mock_parameter_file)
+       write(*,'(a,a)')        '  mock_outputfilename = ',trim(mock_outputfilename)
+       write(*,'(a,L1)')       '  use_filter          = ',use_filter
+       write(*,'(a)')          ' '       
+       write(*,'(a)')          '--------------------------------------------------------------------------------'
+       write(*,'(a)')          ' '
+       !--FILTER--
+       if (use_filter) call print_filter_params
+       !--RETLIF--
+    end if
+
+    return
+
+  end subroutine print_mock_params
 
 end module module_mock
 !--LEEP--

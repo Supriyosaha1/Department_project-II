@@ -8,15 +8,13 @@ module module_filter
   character(1000) :: FilterFile   ! where filter response can be found.
   real(kind=8)    :: redshift=0d0 ! the redshift of the observation we wish to make
 
-  logical         :: use_filter=.false.  ! set to true if used 
-
+  real(kind=8)    :: OnePlusZ
   integer(kind=4) :: filter_nlamb
   real(kind=8)    :: filter_lstart, filter_lend  ! start/end wavelengths in Angstom
   real(kind=8)    :: filter_dl
   real(kind=8),allocatable :: filter_transmission(:)
 
-  public:: filter_response,load_filter,read_filter_params
-  public:: use_filter
+  public:: filter_response,read_filter_params,print_filter_params
 
 contains
 
@@ -30,6 +28,7 @@ contains
     integer(kind=4) :: ilam
 
     lambda = clight / nu * 1e8  ! Angstrom
+    lambda = lambda * OnePlusZ  ! observer-frame
     ilam = int((lambda-filter_lstart)/filter_dl) + 1
     if (ilam < 1 .or. ilam > filter_nlamb) then
        filter_response = 0.0d0
@@ -54,9 +53,6 @@ contains
     read(10,*) ! skip header
     read(10,*) filter_lstart ! observer-frame
     read(10,*) filter_lend 
-    ! move to rest-frame
-    filter_lstart = filter_lstart / (1.0d0 + redshift)
-    filter_lend   = filter_lend / (1.0d0 + redshift)
     read(10,*) filter_nlamb
     allocate(filter_transmission(filter_nlamb))
     filter_dl = (filter_lend - filter_lstart)/(filter_nlamb-1)
@@ -64,8 +60,6 @@ contains
        read(10,*) filter_transmission(i)
     end do
     close(10)
-
-    use_filter = .true.
     
     return
 
@@ -113,6 +107,7 @@ contains
              write(FilterFile,'(a)') trim(value)
           case ('redshift')
              read(value,*) redshift
+             OnePlusZ = 1.0d0 + redshift
           end select
        end do
     end if
@@ -124,5 +119,35 @@ contains
 
   end subroutine read_filter_params
 
+  
+  subroutine print_filter_params(unit)
+
+    ! ---------------------------------------------------------------------------------
+    ! write parameter values to std output or to an open file if argument unit is
+    ! present.
+    ! ---------------------------------------------------------------------------------
+
+    integer(kind=4),optional,intent(in) :: unit
+
+    if (present(unit)) then 
+       write(unit,'(a,a,a)')   '[filter]'
+       write(unit,'(a,a)')     '  FilterFile = ',trim(FilterFile)
+       write(unit,'(a,e14.6)')   '  redshift   = ',redshift
+       write(unit,'(a)')       ' '
+    else
+       write(*,'(a)')          '--------------------------------------------------------------------------------'
+       write(*,'(a)')          ' '
+       write(*,'(a,a,a)')      '[filter]'
+       write(*,'(a,a)')        '  FilterFile = ',trim(FilterFile)
+       write(*,'(a,e14.6)')      '  redshift   = ',redshift
+       write(*,'(a)')          ' '
+       write(*,'(a)')          '--------------------------------------------------------------------------------'
+       write(*,'(a)')          ' '
+    end if
+    
+    return
+
+  end subroutine print_filter_params
+  
 end module module_filter
   

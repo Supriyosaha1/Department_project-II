@@ -601,6 +601,8 @@ contains
           ! if tau is not absurdly large, increment detectors 
           if (tau < tau_max) then
              peel_contrib = PeelBuffer(ipeel)%weight * exp(-tau) * 2.0d0
+
+
              if (increment_flux)  call peel_to_flux(peel_contrib,idir) 
              if (increment_spec)  call peel_to_spec(PeelBuffer(ipeel)%nu,peel_contrib,idir)
              if (increment_cube)  call peel_to_cube(projpos,PeelBuffer(ipeel)%nu,peel_contrib,idir)
