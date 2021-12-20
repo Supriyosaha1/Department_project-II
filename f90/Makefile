@@ -1,17 +1,25 @@
 #############################################################################
 # Fortran compiler options and directives
 
+SYSTYPE="PSMN"
 #SYSTYPE="CCF"
 #SYSTYPE="lyocral"
 #SYSTYPE="lyocralP"
 #SYSTYPE="mac"
-SYSTYPE="macP"
+#SYSTYPE="macP"
 #SYSTYPE="ccage"
 #SYSTYPE="horizon"
 
 OPTIONS = -cpp -fopenmp
 OPTIONS += -DDISPLAY_PROGRESS_PERCENT
 
+ifeq ($(SYSTYPE),"PSMN")
+F90         = mpif90
+#FFLAGS      = -g -check all -traceback
+FFLAGS      = -O3 -fpp -ftz -ipo -fno-alias -fno-fnalias -no-prec-div -no-prec-sqrt -align all
+FFLAGS += $(OPTIONS)
+LDFLAGS     = -lmpi
+endif
 
 ifeq ($(SYSTYPE),"lyocral")
 F90         = ifort
@@ -43,15 +51,15 @@ endif
 ifeq ($(SYSTYPE),"mac")
 #F90         = gfortran-mp-4.7 -ffree-line-length-none -ffree-form  ###-fopenmp
 F90         = gfortran-mp-8 -ffree-line-length-none -ffree-form  ###-fopenmp
-#FFLAGS      = -g -fcheck=all -ftrapv -fbacktrace -Wall -fbounds-check
-FFLAGS      = -O2
+FFLAGS      = -g -fcheck=all -ftrapv -fbacktrace -Wall -fbounds-check
+#FFLAGS      = -O2
 FFLAGS += $(OPTIONS)
 LDFLAGS     = #-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/
 endif
 
 
 ifeq ($(SYSTYPE),"macP")
-F90         = mpif90-openmpi-gcc11
+F90         = mpif90-openmpi-gcc8
 FFLAGS      = -g -fcheck=all -ffree-line-length-none -ffree-form -ftrapv -fbounds-check -fbacktrace -Wall
 #FFLAGS      = -O3
 FFLAGS += $(OPTIONS)
@@ -81,11 +89,11 @@ endif
 
 # choose the gas mix you want to use
 # 1/ HI, D, and dust
-#COMPOBJS = module_dust_model.o module_D_1215_model.o module_HI_1216_model.o module_gas_composition_HI_D_dust.o
+COMPOBJS = module_dust_model.o module_D_1215_model.o module_HI_1216_model.o module_gas_composition_HI_D_dust.o
 # 2/ HI and dust
 #COMPOBJS = module_dust_model.o module_HI_1216_model.o module_gas_composition_HI_dust.o
 # 3/ pure HI
-COMPOBJS = module_HI_1216_model.o module_gas_composition_HI.o
+#COMPOBJS = module_HI_1216_model.o module_gas_composition_HI.o
 # 4/ pure RAMSES hydro variables
 #COMPOBJS = module_gas_composition_ramses.o
 # 5/ SiII 1190/1193
