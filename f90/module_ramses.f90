@@ -1099,7 +1099,7 @@ contains
     if(verbose) write(*,*)'Getting CPU list...'
     
     call read_hilbert_keys_raw(repository,snapnum,ncpu,bound_key)
-    
+
     ! Set up the periodic domains
     dom_min(1) = xmin;   dom_max(1) = xmax
     dom_min(2) = ymin;   dom_max(2) = ymax
@@ -1302,6 +1302,10 @@ contains
     if (trim(orderingtype) .ne. 'bisection') then
        read(param_unit,iostat=ios) bound_key
        !print*,'ios bk =',ios
+
+       ! JB:
+       !ios = 1
+       ! -JB
        if(ios/=0) then ! read in dp
           print*,'Reading Hilbert keys in quad precision failed, read them in double precision...'
           close(param_unit)
@@ -1319,6 +1323,8 @@ contains
              call read_hilbert_keys(repository,snapnum,ncpu,bound_key_dp)
           end if
           bound_key = real(bound_key_dp, kind=qdp)
+       else
+          print*,'Reading Hilbert keys in quad precision: success ...'
        end if
      end if
 
@@ -3194,6 +3200,9 @@ contains
     real(kind=8),allocatable               :: age(:),m(:),x(:,:),v(:,:),mets(:),imass(:)
     real(kind=8)                           :: temp(3)
     integer(kind=4)                        :: rank, iunit, ilast_all
+    !JB- is impatient ... 
+    logical::read_domain
+    !-JB
     
     ! get cosmological parameters to convert conformal time into ages
     call read_cosmo_params(repository,snapnum,omega_0,lambda_0,little_h)
@@ -3237,7 +3246,7 @@ contains
 !$OMP SHARED(cosmo, use_initial_mass, use_proper_time) &
 !$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_mass_all, star_met_all)
 !$OMP DO
-    do icpu = 1, ncpu
+    cpuloop: do icpu = 1, ncpu
        rank = 1
        !$ rank = OMP_GET_THREAD_NUM()
        iunit=10+rank*2
@@ -3251,17 +3260,35 @@ contains
        read(iunit)
        read(iunit)
        read(iunit)
+
        allocate(age(1:npart))
        allocate(x(1:npart,1:ndim),m(npart),imass(npart))
        allocate(id(1:npart))
        allocate(mets(1:npart))
        allocate(v(1:npart,1:ndim))
+       
        do ifield = 1,nfields
           select case(trim(ParticleFields(ifield)))
           case('pos')
              do i = 1,ndim
                 read(iunit) x(1:npart,i)
              end do
+             ! JB-
+             read_domain=.false.
+             do i =1,npart
+                if (domain_contains_point(x(i,:),selection_domain)) then
+                   read_domain = .true.
+                   exit
+                end if
+             end do
+             if (.not. read_domain) then
+                deallocate(age,m,x,id,mets,v,imass)
+                close(iunit)
+                !print*,'skipping cpu ',icpu,irank
+                cycle cpuloop
+             end if
+             print*,'--- reading cpu ',icpu,rank
+             !-JB
           case('vel')
              do i = 1,ndim 
                 read(iunit) v(1:npart,i)
@@ -3335,7 +3362,7 @@ contains
 
     deallocate(star_age,star_pos,star_vel,star_met,star_mass)
 
-    enddo
+ enddo cpuloop
 !$OMP END DO
 !$OMP END PARALLEL
 
