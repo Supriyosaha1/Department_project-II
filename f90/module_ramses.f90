@@ -72,7 +72,7 @@ module module_ramses
   logical                  :: self_shielding    = .true.   ! if true, reproduce self-shielding approx made in ramses to compute nHI. 
   logical                  :: ramses_rt         = .false.  ! if true, read ramses-RT output and compute nHI and T accordingly.
   logical                  :: read_rt_variables = .false.  ! if true, read RT variables (e.g. to compute heating terms)
-  logical                  :: use_initial_mass  = .false.  ! if true, use initial masses of star particles instead of mass at output time
+  ! logical                  :: use_initial_mass  = .false.  ! if true, use initial masses of star particles instead of mass at output time
   logical                  :: cosmo             = .true.   ! if false, assume idealised simulation
   logical                  :: use_proper_time   = .false.  ! if true, use proper time instead of conformal time for cosmo runs. 
   ! miscelaneous
@@ -83,27 +83,19 @@ module module_ramses
   integer(kind=4) :: ihii   = 7 ! index of HII fraction 
   integer(kind=4) :: iheii  = 8 ! index of HeII fraction 
   integer(kind=4) :: iheiii = 9 ! index of HeIII fraction 
-  ! Solar abundance ratio
-  ! Si
-  ! abundance_Si_mass == abundance_Si_number * 28.085
-  real(kind=8),parameter    :: abundance_Si_number = 3.24d-5 ! From Scarlata (private comm.)
-  ! Mg
-  ! abundance_Mg_mass == abundance_Mg_number * 24.305
-  real(kind=8),parameter    :: abundance_Mg_number = 3.39d-5 ! From Scarlata (private comm.)
-  ! Fe
-  ! abundance_Fe_mass == abundance_Fe_number * 55.845
-  real(kind=8),parameter    :: abundance_Fe_number = 2.82d-5 ! From Scarlata (private comm.)
+  ! Ratio between deuterium and hydrogen
+  real(kind=8)              :: deut2H_nb_ratio = 3.0d-5
   ! --------------------------------------------------------------------------
   
-  public :: ramses_get_leaf_cells_slomp, ramses_get_leaf_cells, ramses_get_leaf_cells_metals
-  public :: ramses_get_leaf_cells_in_domain_slomp, get_ngridtot_cpus
+  public :: ramses_get_leaf_cells
+  public :: get_ngridtot_cpus
   public :: ramses_get_box_size_cm, get_cpu_list, get_cpu_list_periodic, get_ncpu
-  public :: ramses_get_velocity_cgs, ramses_get_T_nhi_cgs, ramses_get_metallicity,  ramses_get_nh_cgs
-  public :: ramses_get_T_nSiII_cgs, ramses_get_T_nMgII_cgs, ramses_get_T_nFeII_cgs
+  public :: ramses_get_velocity_cgs, ramses_get_T_nhi_cgs, ramses_get_metallicity,  ramses_get_nh_cgs, ramses_get_deuterium
   public :: ramses_get_nh_nhi_nhei_nehii_cgs
   public :: ramses_read_stars_in_domain
   public :: read_ramses_params, print_ramses_params, dump_ramses_info
   public :: ramses_get_LyaEmiss_HIDopwidth,ramses_get_cooling_time
+  public :: ramses_get_HaEmiss_HIDopwidth
   
   !==================================================================================
 contains
@@ -113,357 +105,14 @@ contains
   ! ----------------
 
 
-  subroutine ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, &
+  subroutine ramses_get_leaf_cells(repository, snapnum, metal_number, krome_data_dir, ions, ncpu_read, cpu_list, &
        & nleaftot, nvar, xleaf_all, ramses_var_all, leaf_level_all, selection_domain)
     ! non-openMP method, as in minirats...
     ! no subroutine, store cell data directly into final arrays
     
     implicit none 
-    character(2000),intent(in)                :: repository
-    integer(kind=4),intent(in)                :: snapnum, ncpu_read
-    integer(kind=4),allocatable,intent(in)    :: cpu_list(:)    
-    integer(kind=4),intent(inout)             :: nleaftot, nvar
-    real(kind=8),allocatable, intent(inout)   :: ramses_var_all(:,:)
-    real(kind=8),allocatable,intent(inout)    :: xleaf_all(:,:)
-    integer(kind=4),allocatable,intent(inout) :: leaf_level_all(:)
-    type(domain),intent(in),optional          :: selection_domain
-    integer(kind=4)                           :: ileaf,nleaf,k,icpu,ivar,iloop
-    real(kind=8)                              :: time1,time2,time3,rate
-    integer(kind=8)                           :: c1,c2,c3,cr
-    character(1000)                           :: filename 
-    logical                                   :: ok_cell
-    integer(kind=4)                           :: i,j,ilevel,nx,ny,nz,nlevelmax,nboundary
-    integer(kind=4)                           :: idim,ind,iu1,iu2,iu3,rank
-    ! stuff read from AMR files
-    integer(kind=4)                           :: ngridmax,ngrid_current
-    real(kind=8),allocatable                  :: xg(:,:)        ! grids position
-    integer(kind=4),allocatable               :: son(:,:)       ! sons grids
-    real(KIND=8),dimension(1:3)               :: xbound=(/0d0,0d0,0d0/)  
-    integer(kind=4),allocatable               :: ngridfile(:,:),ngridlevel(:,:),ngridbound(:,:)
-    integer(kind=4)                           :: ngrida,ncpused
-    logical,allocatable                       :: ref(:,:)
-    real(kind=8)                              :: dx,boxlen
-    integer(kind=4)                           :: ix,iy,iz,nvarH,nvarRT
-    real(kind=8),allocatable                  :: xc(:,:),xp(:,:,:)
-    ! stuff read from the HYDRO files
-    real(kind=8),allocatable                  :: var(:,:,:)
-    real(kind=4),allocatable                  :: var_sp(:)
-    logical                                   :: cellInDomain
-    real(kind=8),dimension(3)                 :: xx
-    logical,allocatable                       :: cpu_is_useful(:)
-    
-    if(verbose) print *,'Reading RAMSES cells...'
-
-    call cpu_time(time1)
-    call system_clock(count_rate=cr)
-    rate = float(cr)
-    call system_clock(c1)
-
-    allocate(cpu_is_useful(ncpu_read))
-    cpu_is_useful = .false.
-
-    if(present(selection_domain))then
-       call ramses_count_leaf_cells_in_domain(repository, snapnum, ncpu_read, cpu_list, &
-            & selection_domain, nleaftot, cpu_is_useful)
-       print*,'nleaftot (new) in selection_domain =',nleaftot
-       ncpused=0
-       do k = 1,ncpu_read
-          if (cpu_is_useful(k)) ncpused=ncpused+1
-       end do
-       print*,'--> ncpu to really read : ',ncpused
-    else
-       nleaftot = get_nleaf_new(repository,snapnum,ncpu_read,cpu_list)
-       print*,'nleaftot (new) =',nleaftot
-       cpu_is_useful = .true.
-    endif
-    
-    call cpu_time(time2)
-    call system_clock(c2)
-    print '(" --> Time to get nleaf new = ",f12.3," seconds.")',time2-time1
-    print '("         system_clock time = ",f12.3," seconds.")',(c2-c1)/rate
-    
-    nvar     = get_nvar(repository,snapnum)
-    allocate(ramses_var_all(nvar,nleaftot), xleaf_all(nleaftot,3), leaf_level_all(nleaftot))
-
-   ! Check whether the ramses output is in single or double precision
-    U_precision = nint(get_param_real(repository,snapnum,'U_precision',default_value=8d0))
-    if(read_rt_variables) then
-       RT_precision = nint(get_param_real(repository,snapnum,'rtprecision' &
-            ,default_value=8d0,rt_info=.true.))
-       print*,'The RT precision is ',RT_precision  !JOKI
-    endif
-
-    if(verbose) print *,'-- ramses_get_leaf_cells : nleaftot(_read), nvar, ncpu(_read) =',nleaftot,nvar,ncpu_read
-
-    
-    rank = 1
-    iu1 = 10+rank*3
-    iu2 = 10+rank*3+1
-    iu3 = 10+rank*3+2
-
-    nleaf=0
-    ileaf=1
-    iloop=0
-    ! loop over cpu
-    do k=1,ncpu_read
-       icpu=cpu_list(k)
-#ifdef DISPLAY_PROGRESS_PERCENT
-       write (*, "(A, f5.2, A, A, $)") &           ! Progress bar that works with ifort
-            ' Reading leaves ',dble(iloop) / ncpu_read * 100,' % ',char(13)
-       iloop=iloop+1
-#endif
-       if (.not. cpu_is_useful(k)) cycle
-       ! verify AMR input file -> already done above in get_nleaf_new
-       write(filename,'(a,a,i5.5,a,i5.5,a,i5.5)') trim(repository),'/output_',snapnum,'/amr_',snapnum,'.out',icpu
-       ! Open AMR file and skip header
-       open(unit=iu1,file=filename,form='unformatted',status='old',action='read')
-       read(iu1)ncpu
-       read(iu1)      !ndim
-       read(iu1)nx,ny,nz
-       read(iu1)nlevelmax
-       read(iu1)ngridmax
-       read(iu1)nboundary
-       read(iu1)ngrid_current
-       read(iu1)boxlen
-       do i=1,13
-          read(iu1)
-       end do
-       !twotondim=2**ndim
-       xbound=(/dble(nx/2),dble(ny/2),dble(nz/2)/)
-       if(allocated(ngridfile)) deallocate(ngridfile,ngridlevel)
-       allocate(ngridfile(1:ncpu+nboundary,1:nlevelmax))
-       allocate(ngridlevel(1:ncpu,1:nlevelmax))
-       if(nboundary>0)then
-          if(allocated(ngridbound)) deallocate(ngridbound)
-          allocate(ngridbound(1:nboundary,1:nlevelmax))
-       endif
-       ! Read grid numbers
-       read(iu1)ngridlevel
-       ngridfile(1:ncpu,1:nlevelmax)=ngridlevel
-       read(iu1)
-       if(nboundary>0)then
-          do i=1,2
-             read(iu1)
-          end do
-          read(iu1)ngridbound
-          ngridfile(ncpu+1:ncpu+nboundary,1:nlevelmax)=ngridbound
-       endif
-       read(iu1)
-       ! ROM: comment the single follwing line for old stuff
-       read(iu1)
-       read(iu1)
-       read(iu1)
-       read(iu1)
-       read(iu1)
-       
-       if(allocated(xc)) deallocate(xc)
-       allocate(xc(1:twotondim,1:ndim))
-       
-       
-       ! open hydro file and get nvarH
-       write(filename,'(a,a,i5.5,a,i5.5,a,i5.5)') trim(repository),'/output_',snapnum,'/hydro_',snapnum,'.out',icpu
-       open(unit=iu2,file=filename,form='unformatted',status='old',action='read')
-       read(iu2)
-       read(iu2)nvarH
-       read(iu2)
-       read(iu2)
-       read(iu2)
-       read(iu2)
-       
-       if (read_rt_variables) then
-          ! Open RT file and get nvarRT
-          write(filename,'(a,a,i5.5,a,i5.5,a,i5.5)') trim(repository),'/output_',snapnum,'/rt_',snapnum,'.out',icpu
-          open(unit=iu3,file=filename,status='old',form='unformatted')
-          read(iu3)
-          read(iu3)nvarRT
-          read(iu3)
-          read(iu3)
-          read(iu3)
-          read(iu3)
-       else
-          nvarRT = 0
-       end if
-       !ncoarse = nx*ny*nz
-       !ncell   = ncoarse+twotondim*ngridmax
-       
-       ! Loop over levels
-       do ilevel=1,nlevelmax
-          
-          ! Geometry
-          dx=0.5**ilevel
-          do ind=1,twotondim
-             iz=(ind-1)/4
-             iy=(ind-1-4*iz)/2
-             ix=(ind-1-2*iy-4*iz)
-             xc(ind,1)=(dble(ix)-0.5D0)*dx
-             xc(ind,2)=(dble(iy)-0.5D0)*dx
-             xc(ind,3)=(dble(iz)-0.5D0)*dx
-          end do
-          
-          ! Allocate work arrays
-          if(allocated(xg)) then 
-             deallocate(xg,son,var,xp,ref)
-          endif
-          if(allocated(var_sp)) deallocate(var_sp)
-          ngrida=ngridfile(icpu,ilevel)
-          if(ngrida>0)then
-             allocate(xg(1:ngrida,1:ndim))
-             allocate(son(1:ngrida,1:twotondim))
-             allocate(var(1:ngrida,1:twotondim,1:nvarh+nvarRT))
-             if((read_rt_variables .and. rt_Precision.eq.4) .or. U_precision.eq.4) allocate(var_sp(1:ngrida))
-             allocate(xp(1:ngrida,1:twotondim,1:ndim))
-             allocate(ref(1:ngrida,1:twotondim))
-             ref=.false.
-          endif
-          
-          
-          ! Loop over domains
-          do j=1,nboundary+ncpu
-             
-             ! Read AMR data
-             if(ngridfile(j,ilevel)>0)then
-                read(iu1) ! Skip grid index
-                read(iu1) ! Skip next index
-                read(iu1) ! Skip prev index
-                ! Read grid center
-                do idim=1,ndim
-                   if(j.eq.icpu)then
-                      read(iu1)xg(:,idim)
-                   else
-                      read(iu1)
-                   endif
-                end do
-                read(iu1) ! Skip father index
-                do ind=1,2*ndim
-                   read(iu1) ! Skip nbor index
-                end do
-                ! Read son index
-                do ind=1,twotondim
-                   if(j.eq.icpu)then
-                      read(iu1)son(:,ind)
-                   else
-                      read(iu1)
-                   end if
-                end do
-                ! Skip cpu map
-                do ind=1,twotondim
-                   read(iu1)
-                end do
-                ! Skip refinement map
-                do ind=1,twotondim
-                   read(iu1)
-                end do
-             endif
-             
-             ! Read HYDRO data
-             read(iu2)
-             read(iu2)
-             if(read_rt_variables)read(iu3)
-             if(read_rt_variables)read(iu3)
-             if(ngridfile(j,ilevel)>0)then
-                ! Read hydro variables
-                do ind=1,twotondim
-                   do ivar=1,nvarh
-                      if(j.eq.icpu)then
-                         if(U_precision.eq.4) then
-                            read(iu2) var_sp(:)
-                            var(:,ind,ivar) = var_sp(:)
-                         else
-                            read(iu2)var(:,ind,ivar)
-                         endif
-                      else
-                         read(iu2)
-                      end if
-                   end do
-                   do ivar=1,nvarRT
-                      if(j.eq.icpu)then
-                         if(rt_Precision.eq.4) then
-                            read(iu3) var_sp(:)
-                            var(:,ind,nvarh+ivar) = var_sp(:)
-                         else
-                            read(iu3)var(:,ind,nvarh+ivar)
-                         endif
-                      else
-                         read(iu3)
-                      end if
-                   end do
-                end do
-             end if
-             
-          enddo ! end loop over domains
-          
-          ! Get leaf cells and store data
-          if(ngrida>0)then
-             ! Loop over cells
-             do ind=1,twotondim
-                ! Compute cell center
-                do i=1,ngrida
-                   xp(i,ind,1)=(xg(i,1)+xc(ind,1)-xbound(1))
-                   xp(i,ind,2)=(xg(i,2)+xc(ind,2)-xbound(2))
-                   xp(i,ind,3)=(xg(i,3)+xc(ind,3)-xbound(3))
-                end do
-                ! Check if cell is refined
-                do i=1,ngrida
-                   ref(i,ind)=son(i,ind)>0.and.ilevel<nlevelmax
-                end do
-                ! Store leaf cells
-                do i=1,ngrida
-                   ok_cell= .not.ref(i,ind)
-                   if(ok_cell)then
-                   !if(.not.ref(i,ind))then
-                      cellInDomain=.true.
-                      if(present(selection_domain))then
-                         !
-                         cellInDomain=.false.
-                         xx(1:3) = xp(i,ind,1:3)
-                         dx = 0.5d0**(ilevel)
-                         if (domain_contains_cell(xx,dx,selection_domain)) cellInDomain=.true.
-                      endif
-                      if(cellInDomain)then
-                         xleaf_all(ileaf,1:3) = xp(i,ind,1:3)
-                         leaf_level_all(ileaf) = ilevel
-                         do ivar = 1,nvar
-                            ramses_var_all(ivar,ileaf) = var(i,ind,ivar)
-                         end do
-                         ileaf=ileaf+1
-                      endif
-                   endif
-                enddo
-             end do
-          endif
-          
-          
-       enddo ! end loop over levels
-       
-       
-       close(iu1)
-       close(iu2)
-       close(iu3)
-       
-    enddo ! end loop over cpu
-
-    !!print*,'Number of leaf cells =',ileaf-1,nvarH+nvarRT
-    !!print*,icpu,ileaf-1
-    nleaf = ileaf-1
-
-    call cpu_time(time3)
-    call system_clock(c3)
-    print '(" --> Time to get leaf = ",f12.3," seconds.")',time3-time2
-    print '("    system_clock time = ",f12.3," seconds.")',(c3-c2)/rate
-
-    print*,'Nleaf read = ',nleaf, nleaftot
-    return
-  end subroutine ramses_get_leaf_cells
-  
-
-   subroutine ramses_get_leaf_cells_metals(repository, snapnum, metal_number, krome_data_dir, ions, ncpu_read, cpu_list, &
-       & nleaftot, nvar, xleaf_all, ramses_var_all, leaf_level_all, selection_domain)
-    ! non-openMP method, as in minirats...
-    ! no subroutine, store cell data directly into final arrays
-    
-    implicit none
-    integer(kind=4),intent(in)                :: snapnum, ncpu_read, metal_number
     character(2000),intent(in)                :: repository, krome_data_dir
+    integer(kind=4),intent(in)                :: snapnum, ncpu_read, metal_number
     character(10),intent(in)                  :: ions(metal_number)
     integer(kind=4),allocatable,intent(in)    :: cpu_list(:)    
     integer(kind=4),intent(inout)             :: nleaftot, nvar
@@ -474,7 +123,7 @@ contains
     integer(kind=4)                           :: ileaf,nleaf,k,icpu,ivar,iloop,ileaf_cpu,nleaf_cpu
     real(kind=8)                              :: time1,time2,time3,rate
     integer(kind=8)                           :: c1,c2,c3,cr
-    character(2000)                           :: filename 
+    character(1000)                           :: filename 
     logical                                   :: ok_cell
     integer(kind=4)                           :: i,j,ilevel,nx,ny,nz,nlevelmax,nboundary
     integer(kind=4)                           :: idim,ind,iu1,iu2,iu3,rank
@@ -778,20 +427,18 @@ contains
                    endif
                 enddo
              end do
-          endif   
-          
+          endif
+                
        enddo ! end loop over levels
        
        
        close(iu1)
        close(iu2)
        close(iu3)
-       
+
        ! --- ions ---
-       !print*,'metal number: ',metal_number
        do i=1,metal_number
           write(filename,'(a,a,a,a,i5.5,a,i5.5)') trim(krome_data_dir),'/',trim(ions(i)),'_',snapnum,'.out',icpu
-          !print*,'filename : ',trim(filename)
           open(unit=iu1,file=trim(filename),form='unformatted',action='read')
           read(iu1) nleaf_cpu
           if(nleaf_cpu /= ileaf_cpu-1) then
@@ -818,8 +465,8 @@ contains
 
     print*,'Nleaf read = ',nleaf, nleaftot
     return
-  end subroutine ramses_get_leaf_cells_metals
-
+  end subroutine ramses_get_leaf_cells
+  
 
 
   subroutine ramses_count_leaf_cells_in_domain(repository, snapnum, &
@@ -1032,280 +679,6 @@ contains
     return
   end subroutine ramses_count_leaf_cells_in_domain
   
-  
-  
-  subroutine ramses_get_leaf_cells_slomp(repository, snapnum, ncpu_read, cpu_list, &
-       & nleaftot, nvar, xleaf_all, ramses_var_all, leaf_level_all)
-    
-    ! read all leaf cells from a simulation snapshot belonging to given
-    ! list of cpus. Return standard ramses variables through 
-    ! ramses_var(nvar,nleaftot) and positions (xleaf(3,nleaftot))
-    ! and levels (leaf_level).
-    ! 05-2020: corrected version that doesn't use cpu_map anymore.
-    !          --> not very efficient
-    
-    !$ use OMP_LIB
-    implicit none 
-    character(2000),intent(in)                :: repository
-    integer(kind=4),intent(in)                :: snapnum, ncpu_read
-    integer(kind=4),dimension(:),allocatable,intent(in) :: cpu_list
-
-    integer(kind=4),intent(inout)             :: nleaftot, nvar
-    real(kind=8),allocatable, intent(inout)   :: ramses_var_all(:,:)
-    real(kind=8),allocatable,intent(inout)    :: xleaf_all(:,:)
-    integer(kind=4),allocatable,intent(inout) :: leaf_level_all(:)
-
-    real(kind=8),allocatable     :: cell_pos(:,:),cell_var(:,:)
-    integer(kind=4),allocatable  :: cell_lev(:)
-    
-    integer(kind=4) :: ileaf,nleaf,k,icpu,ilast,ncell,ivar,iloop
-    real(kind=8) :: time1,time2,time3,rate,ot1,ot2,ot3
-    integer(kind=8) :: c1,c2,c3,cr
-    
-    if(verbose) print *,'Reading RAMSES cells...'
-
-    ot1=0.
-    ot2=0.
-    ot3=0.
-    call system_clock(count_rate=cr)
-    rate = float(cr)
-    call system_clock(c1)
-    call cpu_time(time1)
-    !$ ot1 = omp_get_wtime()
-    
-    nleaftot = get_nleaf_new(repository,snapnum,ncpu_read,cpu_list)
-    print*,'nleaftot (new) =',nleaftot
-
-    call cpu_time(time2)
-    call system_clock(c2)
-    !$ ot2 = omp_get_wtime()
-    print '(" --> Time to get nleaf new = ",f12.3," seconds.")',time2-time1
-    print '("         system_clock time = ",f12.3," seconds.")',(c2-c1)/rate
-    print '("             omp_get_wtime = ",f12.3," seconds.")',ot2-ot1
-    
-    nvar     = get_nvar(repository,snapnum)
-    allocate(ramses_var_all(nvar,nleaftot), xleaf_all(nleaftot,3), leaf_level_all(nleaftot))
-
-   ! Check whether the ramses output is in single or double precision
-    U_precision = nint(get_param_real(repository,snapnum,'U_precision',default_value=8d0))
-    if(read_rt_variables) then
-       RT_precision = nint(get_param_real(repository,snapnum,'rtprecision' &
-            ,default_value=8d0,rt_info=.true.))
-       print*,'The RT precision is ',RT_precision  !JOKI
-    endif
-
-    if(verbose) print *,'-- ramses_get_leaf_cells : nleaftot(_read), nvar, ncpu(_read) =',nleaftot,nvar,ncpu_read
-
-    
-    nleaf=0
-    ilast=1
-    iloop=0
-!$OMP PARALLEL &
-!$OMP DEFAULT(private) &
-!$OMP SHARED(nleaf, repository, snapnum, ncpu_read, cpu_list, ilast, nvar, xleaf_all, leaf_level_all, ramses_var_all, iloop)
-!!!!!$OMP DO
-!$OMP DO SCHEDULE(DYNAMIC, 5) 
-    do k=1,ncpu_read
-       icpu=cpu_list(k)
-
-       call get_leaf_cells_per_cpu(repository,snapnum,icpu,ileaf,ncell,cell_pos,cell_var,cell_lev)
-
-!$OMP CRITICAL
-#ifdef DISPLAY_PROGRESS_PERCENT
-       write (*, "(A, f5.2, A, A, $)") &           ! Progress bar that works with ifort
-            ' Reading leaves ',dble(iloop) / ncpu_read * 100,' % ',char(13)
-       iloop=iloop+1
-#endif
-       ! ileaf is now the number of leaves on local cpu
-       if(ileaf .gt. 0) then
-          ! save leaf cells to return arrays
-          xleaf_all(ilast:ilast-1+ileaf,1:3)  = cell_pos(1:ileaf,1:3)
-          leaf_level_all(ilast:ilast-1+ileaf) = cell_lev(1:ileaf)
-          !do ivar = 1,nvar
-          !   ramses_var_all(ivar,ilast:ilast-1+ileaf) = cell_var(1:ileaf,ivar)
-          !end do
-          ramses_var_all(1:nvar,ilast:ilast-1+ileaf) = cell_var(1:nvar,1:ileaf)
-       endif
-       ilast=ilast+ileaf
-       nleaf=nleaf+ileaf
-!$OMP END CRITICAL
-    end do
-!$OMP END DO
-!$OMP END PARALLEL
-
-    call cpu_time(time3)
-    print '(" --> Time to get leaf = ",f12.3," seconds.")',time3-time2
-    call system_clock(c3)
-    print '("    system_clock time = ",f12.3," seconds.")',(c3-c2)/rate
-    !$ ot3 = omp_get_wtime()
-    print '("        omp_get_wtime = ",f12.3," seconds.")',ot3-ot2
-
-    print*,'Nleaf read = ',nleaf
-    return
-  end subroutine ramses_get_leaf_cells_slomp
-
-
-
-  subroutine ramses_get_leaf_cells_in_domain_slomp(repository, snapnum, selection_domain, &
-       & ncpu_read, cpu_list, &
-       & nleaftot_all, nvar, xleaf_all, ramses_var_all, leaf_level_all)
-
-    ! Read leaf cells from a selection of cpu files in a simulation snapshot
-    ! and select cells inside selection_domain.
-    !
-    ! Return standard ramses variables through ramses_var(nvar,nleaftot) and
-    ! positions (xleaf(3,nleaftot)) and levels (leaf_level).
-    !
-    ! Slower method since it needs to read 2 times each file (one to count, one to extract)
-    
-    implicit none 
-
-    character(2000),intent(in)                :: repository
-    integer(kind=4),intent(in)                :: snapnum, ncpu_read
-    type(domain),intent(in)                   :: selection_domain
-    integer(kind=4),intent(inout)             :: nleaftot_all, nvar
-    integer(kind=4)                           :: nleaftot
-    real(kind=8),allocatable                  :: ramses_var(:,:)
-    real(kind=8),allocatable                  :: xleaf(:,:)
-    integer(kind=4),allocatable               :: leaf_level(:)
-    real(kind=8),allocatable, intent(inout)   :: ramses_var_all(:,:)
-    real(kind=8),allocatable,intent(inout)    :: xleaf_all(:,:)
-    integer(kind=4),allocatable,intent(inout) :: leaf_level_all(:)
-    integer(kind=4),allocatable,intent(in)    :: cpu_list(:)
-    
-    logical                                   :: do_allocs
-    integer(kind=4)                           :: icpu, ivar, nleaf_in_domain, k, i
-    integer(kind=4)                           :: ileaf, ilast, iloop=0, nleaf, ncell
-    real(kind=8),dimension(3)                 :: xtemp
-    real(kind=8)                              :: dx
-
-    real(kind=8),allocatable                  :: cell_var(:,:)
-    real(kind=8),allocatable                  :: cell_pos(:,:)
-    integer(kind=4),allocatable               :: cell_lev(:)
-    integer(kind=4)                           :: nLeafInCpu
-    logical,allocatable                       :: cpu_is_useful(:)
-    
-    if(verbose) print *,'Reading RAMSES cells...'
-
-    nvar = get_nvar(repository,snapnum)
-    ncpu = get_ncpu(repository,snapnum)
-    ! Check whether the ramses output is in single or double precision
-    U_precision = nint(get_param_real(repository,snapnum,'U_precision',default_value=8d0))
-    if(read_rt_variables) then
-       RT_precision = nint(get_param_real(repository,snapnum,'rtprecision' &
-            ,default_value=8d0,rt_info=.true.))
-       print*,'The RT precision is ',RT_precision
-    endif
-    allocate(cpu_is_useful(ncpu_read))
-    cpu_is_useful = .false.
-
-    ! first count leaf cells in selection_domain...
-    nleaftot = 0 ; nleaf_in_domain = 0 ; iloop=0
-!$OMP PARALLEL &
-!$OMP REDUCTION(+:nleaftot,nleaf_in_domain) &
-!$OMP DEFAULT(private) &
-!$OMP SHARED(iloop,repository, snapnum, ncpu_read, cpu_list, selection_domain, cpu_is_useful)
-!$OMP DO
-    do k=1,ncpu_read
-       icpu=cpu_list(k)
-       nLeafInCpu = 0
-
-       call get_leaf_cells_per_cpu(repository,snapnum,icpu,ileaf,ncell,cell_pos,cell_var,cell_lev)
-       
-       ! count leaf cells in selection_domain
-       do i = 1,ileaf
-          xtemp(:) = cell_pos(i,:)
-          dx = 0.5d0**(cell_lev(i))
-          nleaftot = nleaftot+1
-          if (domain_contains_cell(xtemp,dx,selection_domain)) then
-             nleaf_in_domain = nleaf_in_domain + 1
-             nLeafInCpu = nLeafInCpu + 1
-          end if
-       end do
-!$OMP CRITICAL
-       cpu_is_useful(k) = (nLeafInCpu > 0)
-#ifdef DISPLAY_PROGRESS_PERCENT
-       !write (*, "(A, f5.2, A, A)", advance='no') &           ! Progress bar
-       !     ' Counting leaves ',dble(iloop) / ncpu_read * 100,' % ',char(13)
-       write (*, "(A, f5.2, A, A, $)") &           ! Progress bar that works with ifort
-            ' Counting leaves ',dble(iloop) / ncpu_read * 100,' % ',char(13)
-#endif
-       iloop=iloop+1
-!$OMP END CRITICAL 
-    end do
-!$OMP END DO
-!$OMP END PARALLEL
-
-    ! JB--
-    nLeafInCpu = 0
-    do k = 1,ncpu_read
-       if (cpu_is_useful(k)) nLeafInCpu = nLeafInCpu + 1
-    end do
-    print*,'--> ncpu to really read : ',nLeafInCpu
-    ! --JB
-    
-    if(verbose)print *,'-- ramses_get_leaf_cells_in_domain: nleaftot, nleaf_in_domain, nvar, ncpu =',nleaftot, nleaf_in_domain, nvar, ncpu_read
-    
-    allocate(ramses_var_all(nvar,nleaf_in_domain), xleaf_all(nleaf_in_domain,3), leaf_level_all(nleaf_in_domain))
-    ilast = 1
-    iloop=0
-!$OMP PARALLEL &
-!$OMP DEFAULT(private) &
-!$OMP SHARED(iloop,ilast, xleaf_all, leaf_level_all, ramses_var_all, repository, snapnum, nvar, nleaftot, ncpu_read, cpu_list, selection_domain, cpu_is_useful, nLeafInCpu)
-    do_allocs=.true.
-!$OMP DO
-    do k=1,ncpu_read
-       ! JB--
-       if (.not. cpu_is_useful(k)) cycle
-       !--JB
-       icpu=cpu_list(k)
-       call get_leaf_cells_per_cpu(repository,snapnum,icpu,nleaf,ncell,cell_pos,cell_var,cell_lev)
-       if (do_allocs) allocate(ramses_var(nvar,ncell), xleaf(ncell,3), leaf_level(ncell))
-       do_allocs=.false.
-       ! collect leaf cells
-       ileaf=0
-       do i = 1,nleaf
-          xtemp(:) = cell_pos(i,:)
-          dx = 0.5d0**(cell_lev(i))
-          if (domain_contains_cell(xtemp,dx,selection_domain)) then
-             ileaf = ileaf + 1
-             !do ivar = 1,nvar
-             !   ramses_var(ivar,ileaf) = cell_var(i,ivar)
-             !end do
-             ramses_var(1:nvar,ileaf) = cell_var(1:nvar,i)
-             xleaf(ileaf,:)    = cell_pos(i,:)
-             leaf_level(ileaf) = cell_lev(i)
-          end if
-       end do
-!$OMP CRITICAL
-#ifdef DISPLAY_PROGRESS_PERCENT
-       !write (*, "(A, f5.2, A, A)", advance='no') &           ! Progress bar
-       !     ' Reading leaves ',dble(iloop) / nLeafInCpu * 100,' % ',char(13)
-       write (*, "(A, f5.2, A, A, $)") &           ! Progress bar that works with ifort
-            ' Reading leaves ',dble(iloop) / nLeafInCpu * 100,' % ',char(13)
-#endif
-       ! only one CRITICAL zone
-       iloop=iloop+1
-       ! ileaf is now the number of leaves on local cpu
-       if(ileaf .gt. 0) then
-          ! save leaf cells to return arrays
-          xleaf_all(ilast:ilast-1+ileaf,1:3)  = xleaf(1:ileaf,1:3)
-          leaf_level_all(ilast:ilast-1+ileaf) = leaf_level(1:ileaf)
-          ramses_var_all(1:nvar,ilast:ilast-1+ileaf) = ramses_var(1:nvar,1:ileaf)
-       endif
-       ilast=ilast+ileaf
-!$OMP END CRITICAL
-    end do
-!$OMP END DO
-    if(allocated(ramses_var)) deallocate(ramses_var,xleaf,leaf_level)
-!$OMP END PARALLEL
-    
-    nleaftot_all = nleaf_in_domain
-    
-    return
-
-  end subroutine ramses_get_leaf_cells_in_domain_slomp
-
 
 
   subroutine get_cpu_list(repository, snapnum, xmin,xmax,ymin,ymax,zmin,zmax, ncpu_read, cpu_list)
@@ -1823,14 +1196,14 @@ contains
   end function get_nGridTot_cpus
 
 
-  subroutine ramses_get_T_nhi_cgs(repository,snapnum,nleaf,nvar,ramses_var,temp,nhi)
+  subroutine ramses_get_T_nhi_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,temp,nhi)
 
     implicit none 
 
     character(1000),intent(in)  :: repository
     integer(kind=4),intent(in)  :: snapnum
-    integer(kind=4),intent(in)  :: nleaf, nvar
-    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
+    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: nhi(nleaf), temp(nleaf)
     real(kind=8),allocatable    :: boost(:)
     real(kind=8)                :: xhi
@@ -1939,14 +1312,14 @@ contains
 
   end subroutine ramses_get_T_nhi_cgs
 
-  subroutine ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar,ramses_var,velocity_cgs)
+  subroutine ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,velocity_cgs)
 
     implicit none
 
     character(1000),intent(in)  :: repository
     integer(kind=4),intent(in)  :: snapnum
-    integer(kind=4),intent(in)  :: nleaf, nvar
-    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
+    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: velocity_cgs(3,nleaf)
 
     ! get conversion factors if necessary
@@ -1961,14 +1334,14 @@ contains
 
   end subroutine ramses_get_velocity_cgs
 
-  subroutine ramses_get_nh_cgs(repository,snapnum,nleaf,nvar,ramses_var,nh)
+  subroutine ramses_get_nh_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,nh)
 
     implicit none
 
     character(1000),intent(in)  :: repository
     integer(kind=4),intent(in)  :: snapnum
-    integer(kind=4),intent(in)  :: nleaf, nvar
-    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
+    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: nh(nleaf)
 
     ! get conversion factors if necessary
@@ -1982,14 +1355,37 @@ contains
     return
 
   end subroutine ramses_get_nh_cgs
+  
 
-
-  subroutine ramses_get_metallicity(nleaf,nvar,ramses_var,metallicity)
+   subroutine ramses_get_deuterium(repository,snapnum,nleaf,nvar,metal_number,ramses_var,nd)
 
     implicit none
 
-    integer(kind=4),intent(in)  :: nleaf, nvar
-    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
+    character(1000),intent(in)  :: repository
+    integer(kind=4),intent(in)  :: snapnum
+    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
+    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
+    real(kind=8),intent(inout)  :: nd(nleaf)
+
+    ! get conversion factors if necessary
+    if (.not. conversion_scales_are_known) then 
+       call read_conversion_scales(repository,snapnum)
+       conversion_scales_are_known = .True.
+    end if
+
+    nd = deut2H_nb_ratio*ramses_var(1,:) * dp_scale_nh ! [ H / cm^3 ]
+
+    return
+
+  end subroutine ramses_get_deuterium
+
+
+  subroutine ramses_get_metallicity(nleaf,nvar,metal_number,ramses_var,metallicity)
+
+    implicit none
+
+    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
+    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: metallicity(nleaf)
 
     if (nvar < 6) then
@@ -2307,237 +1703,75 @@ contains
     
   end subroutine ramses_get_LyaEmiss_HIDopwidth
 
-  
-  subroutine ramses_get_T_nSiII_cgs(repository,snapnum,nleaf,nvar,ramses_var,temp,nSiII)
 
-    implicit none 
+  subroutine ramses_get_HaEmiss_HIDopwidth(repository,snapnum,nleaf,nvar,var,conv_factor,HaEm,HIDopwidth,sample)
 
-    character(1000),intent(in)            :: repository
-    integer(kind=4),intent(in)            :: snapnum
-    integer(kind=4),intent(in)            :: nleaf, nvar
-    real(kind=8),intent(in)               :: ramses_var(nvar,nleaf) ! one cell only
-    real(kind=8),intent(inout)            :: nSiII(nleaf), temp(nleaf)
-    real(kind=8),allocatable              :: boost(:)
-    integer(kind=4)                       :: ihx,ihy,i
-    real(kind=8)                          :: xx,yy,dxx1,dxx2,dyy1,dyy2,f
-    integer(kind=4)                       :: if1,if2,jf1,jf2
-    real(kind=8),allocatable,dimension(:) :: mu, nh
+    implicit none
 
+    character(1000),intent(in)  :: repository
+    integer(kind=4),intent(in)  :: snapnum
+    integer(kind=4),intent(in) :: nleaf,nvar
+    real(kind=8),intent(in)    :: var(nvar,nleaf), conv_factor   ! "conv_factor" is the conversion factor from the LyA to the line we want.
+    real(kind=8),intent(inout) :: HaEm(:),HIDopwidth(:)
+    integer(kind=4),intent(in),optional :: sample(:)
+
+    integer(kind=4)            :: n,j,i
+    real(kind=8),parameter     :: e_lya = planck * clight / (1215.67d0/cmtoA) ! [erg] energy of a Lya photon (consistent with HI_model)
+    real(kind=8)               :: xhii,xheii,xheiii,nh,nhi,nhii,n_e,mu,TK,Ta,prob_case_B,alpha_B,lambda,nhe,LyaEm
+    logical                    :: subsample
+    
     ! get conversion factors if necessary
     if (.not. conversion_scales_are_known) then 
        call read_conversion_scales(repository,snapnum)
        conversion_scales_are_known = .True.
     end if
 
-
-    if(ramses_rt)then
-       ! ramses RT
-       allocate(mu(1:nleaf))
-       mu   = XH * (1.d0+ramses_var(ihii,:)) + 0.25d0*(1.d0-XH)*(1.d0 + ramses_var(iheii,:) + 2.d0*ramses_var(iheiii,:)) ! assumes no metals
-       mu   = 1.0d0 / mu
-       temp = ramses_var(itemp,:) / ramses_var(1,:) * dp_scale_T2            ! T/mu [ K ]
-       temp = temp * mu                                                      ! This is now T (in K) with no bloody mu ... 
-       deallocate(mu)
+    if (present(sample)) then
+       n = size(sample)
+       subsample = .true.
     else
-       ! ramses standard
-       if (.not. cooling_is_read) then
-          call read_cooling(repository,snapnum)
-          cooling_is_read = .True.
-       end if
-       allocate(nh(nleaf))
-       nh   = ramses_var(1,:) * dp_scale_nh  ! nb of H atoms per cm^3
-       temp = ramses_var(itemp,:) / ramses_var(1,:) * dp_scale_T2  ! T/mu [ K ]
-       allocate(boost(nleaf))
-       if (self_shielding) then
-          do i=1,nleaf
-             boost(i)=MAX(exp(-nh(i)/0.01),1.0D-20) ! same as hard-coded in RAMSES. 
-          end do
-       else
-          boost = 1.0d0
-       end if
-       ! compute the ionization state and temperature using the 'cooling' tables
-       do i = 1, nleaf
-          xx  = min(max(log10(nh(i)/boost(i)),cooling%nh(1)),cooling%nh(cooling%n11))
-          ihx = int((xx - cool_int%nh_start)/cool_int%nh_step) + 1
-          if (ihx < 1) then 
-             ihx = 1 
-          else if (ihx > cool_int%n_nh) then
-             ihx = cool_int%n_nh
-          end if
-          yy  = log10(temp(i))
-          ihy = int((yy - cool_int%t2_start)/cool_int%t2_step) + 1
-          if (ihy < 1) then 
-             ihy = 1 
-          else if (ihy > cool_int%n_t2) then
-             ihy = cool_int%n_t2
-          end if
-          ! 2D linear interpolation:
-          if (ihx < cool_int%n_nh) then 
-             dxx1  = max(xx - cooling%nh(ihx),0.0d0) / cool_int%nh_step 
-             dxx2  = min(cooling%nh(ihx+1) - xx,cool_int%nh_step) / cool_int%nh_step
-             if1  = ihx
-             if2  = ihx+1
-          else
-             dxx1  = 0.0d0
-             dxx2  = 1.0d0
-             if1  = ihx
-             if2  = ihx
-          end if
-          if (ihy < cool_int%n_t2) then 
-             dyy1  = max(yy - cooling%t2(ihy),0.0d0) / cool_int%t2_step
-             dyy2  = min(cooling%t2(ihy+1) - yy,cool_int%t2_step) / cool_int%t2_step
-             jf1  = ihy
-             jf2  = ihy + 1
-          else
-             dyy1  = 0.0d0
-             dyy2  = 1.0d0
-             jf1  = ihy
-             jf2  = ihy
-          end if
-          if (abs(dxx1+dxx2-1.0d0) > 1.0d-6 .or. abs(dyy1+dyy2-1.0d0) > 1.0d-6) then 
-             write(*,*) 'Fucked up the interpolation ... '
-             print*,dxx1+dxx2,dyy1+dyy2
-             stop
-          end if
-          ! GET MU to convert T/MU into T ... 
-          f = dxx1 * dyy1 * cooling%mu(if2,jf2) + dxx2 * dyy1 * cooling%mu(if1,jf2) &
-               & + dxx1 * dyy2 * cooling%mu(if2,jf1) + dxx2 * dyy2 * cooling%mu(if1,jf1)
-          temp(i) = temp(i) * f   ! This is now T (in K) with no bloody mu ... 
-       end do
-       deallocate(boost,nh)
-    endif       
-    
-    ! from T, we can compute the SiII fraction as 100% between 6.306571e+04 K and 1.264600e+05 K, and 0% elsewhere.
-    ! (These limits correspond to the following ionisation energies:
-    ! - Si-Si+   : 8.15169 ev
-    ! - Si+-Si++ : 16.34585 eV
-    do i = 1,nleaf
-       if (temp(i) >= 6.306571d4 .and. temp(i) <= 1.2646d5) then
-          nSiII(i) = ramses_var(1,i) * dp_scale_d * ramses_var(imetal,i) * dp_scale_zsun * abundance_Si_number   ! [#/cm3]
-       else
-          nSiII(i) = 0.0d0
-       end if
-    end do
-    
-    return
-
-  end subroutine ramses_get_T_nSiII_cgs
-
-
-
-  subroutine ramses_get_T_nMgII_cgs(repository,snapnum,nleaf,nvar,ramses_var,temp,nMgII)
-
-    implicit none 
-
-    character(1000),intent(in)            :: repository
-    integer(kind=4),intent(in)            :: snapnum
-    integer(kind=4),intent(in)            :: nleaf, nvar
-    real(kind=8),intent(in)               :: ramses_var(nvar,nleaf) ! one cell only
-    real(kind=8),intent(inout)            :: nMgII(nleaf), temp(nleaf)
-    real(kind=8),allocatable              :: boost(:)
-    integer(kind=4)                       :: ihx,ihy,i
-    real(kind=8)                          :: xx,yy,dxx1,dxx2,dyy1,dyy2,f
-    integer(kind=4)                       :: if1,if2,jf1,jf2
-    real(kind=8),allocatable,dimension(:) :: mu, nh
-
-    ! get conversion factors if necessary
-    if (.not. conversion_scales_are_known) then 
-       call read_conversion_scales(repository,snapnum)
-       conversion_scales_are_known = .True.
+       n = nleaf
+       subsample = .false. 
     end if
 
     if(ramses_rt)then
-       ! ramses RT
-       allocate(mu(1:nleaf))
-       mu   = XH * (1.d0+ramses_var(ihii,:)) + 0.25d0*(1.d0-XH)*(1.d0 + ramses_var(iheii,:) + 2.d0*ramses_var(iheiii,:)) ! assumes no metals
-       mu   = 1.0d0 / mu
-       temp = ramses_var(itemp,:) / ramses_var(1,:) * dp_scale_T2                ! T/mu [ K ]
-       temp = temp * mu                                                      ! This is now T (in K) with no bloody mu ... 
-       deallocate(mu)
-    else
-       ! ramses standard
-       if (.not. cooling_is_read) then
-          call read_cooling(repository,snapnum)
-          cooling_is_read = .True.
-       end if
-       allocate(nh(nleaf))
-       nh   = ramses_var(1,:) * dp_scale_nh  ! nb of H atoms per cm^3
-       temp = ramses_var(itemp,:) / ramses_var(1,:) * dp_scale_T2  ! T/mu [ K ]
-       allocate(boost(nleaf))
-       if (self_shielding) then
-          do i=1,nleaf
-             boost(i)=MAX(exp(-nh(i)/0.01),1.0D-20) ! same as hard-coded in RAMSES. 
-          end do
-       else
-          boost = 1.0d0
-       end if
-       ! compute the ionization state and temperature using the 'cooling' tables
-       do i = 1, nleaf
-          xx  = min(max(log10(nh(i)/boost(i)),cooling%nh(1)),cooling%nh(cooling%n11))
-          ihx = int((xx - cool_int%nh_start)/cool_int%nh_step) + 1
-          if (ihx < 1) then 
-             ihx = 1 
-          else if (ihx > cool_int%n_nh) then
-             ihx = cool_int%n_nh
-          end if
-          yy  = log10(temp(i))
-          ihy = int((yy - cool_int%t2_start)/cool_int%t2_step) + 1
-          if (ihy < 1) then 
-             ihy = 1 
-          else if (ihy > cool_int%n_t2) then
-             ihy = cool_int%n_t2
-          end if
-          ! 2D linear interpolation:
-          if (ihx < cool_int%n_nh) then 
-             dxx1  = max(xx - cooling%nh(ihx),0.0d0) / cool_int%nh_step 
-             dxx2  = min(cooling%nh(ihx+1) - xx,cool_int%nh_step) / cool_int%nh_step
-             if1  = ihx
-             if2  = ihx+1
-          else
-             dxx1  = 0.0d0
-             dxx2  = 1.0d0
-             if1  = ihx
-             if2  = ihx
-          end if
-          if (ihy < cool_int%n_t2) then 
-             dyy1  = max(yy - cooling%t2(ihy),0.0d0) / cool_int%t2_step
-             dyy2  = min(cooling%t2(ihy+1) - yy,cool_int%t2_step) / cool_int%t2_step
-             jf1  = ihy
-             jf2  = ihy + 1
-          else
-             dyy1  = 0.0d0
-             dyy2  = 1.0d0
-             jf1  = ihy
-             jf2  = ihy
-          end if
-          if (abs(dxx1+dxx2-1.0d0) > 1.0d-6 .or. abs(dyy1+dyy2-1.0d0) > 1.0d-6) then 
-             write(*,*) 'Fucked up the interpolation ... '
-             print*,dxx1+dxx2,dyy1+dyy2
-             stop
-          end if
-          ! GET MU to convert T/MU into T ... 
-          f = dxx1 * dyy1 * cooling%mu(if2,jf2) + dxx2 * dyy1 * cooling%mu(if1,jf2) &
-               & + dxx1 * dyy2 * cooling%mu(if2,jf1) + dxx2 * dyy2 * cooling%mu(if1,jf1)
-          temp(i) = temp(i) * f   ! This is now T (in K) with no bloody mu ... 
-       end do
-       deallocate(boost,nh)
-    endif       
-    
-    ! from T, we can compute the MgII fraction as 100% between 5.915393e+04 K and 1.163181e+05 K, and 0% elsewhere.
-    ! (These limits correspond to the following ionisation energies:
-    ! - Mg  - Mg+  :  7.646235 ev
-    ! - Mg+ - Mg++ : 15.03527 eV
-    do i = 1,nleaf
-       if (temp(i) >= 5.915393d4 .and. temp(i) <= 1.163181d5) then
-          nMgII(i) = ramses_var(1,i) * dp_scale_d * ramses_var(imetal,i) * dp_scale_zsun * abundance_Mg_number   ! [#/cm3]
-       else
-          nMgII(i) = 0.0d0
-       end if
-    end do
-    
-    return
+       do j=1,n
 
-  end subroutine ramses_get_T_nMgII_cgs
+          if (subsample) then
+             i = sample(j)
+          else
+             i = j
+          end if
+
+          xhii   = var(ihii,i)
+          xheii  = var(iheii,i)
+          xheiii = var(iheiii,i)
+          nh     = var(1,i) * dp_scale_nh
+          nhe    = 0.25*nh*(1.0d0-XH)/XH
+          nhii   = nh * xhii
+          nhi    = nh * (1.0d0 - xhii)
+          n_e    = nHII + nHe * (xHeII + 2.0d0*xHeIII)
+          mu     = 1./( XH*(1.+xHII) + 0.25d0*(1.0d0-XH)*(1.+xHeII+2.*xHeIII) )
+          TK     = var(itemp,i)/var(1,i)*mu*dp_scale_T2
+          HIDopwidth(j) = sqrt((2.0d0*kb/mp)*TK)
+          ! Cantalupo+(08)
+          Ta = max(TK,100.0) ! no extrapolation..
+          prob_case_B = 0.686 - 0.106*log10(Ta/1e4) - 0.009*(Ta/1e4)**(-0.44)
+          ! Hui & Gnedin (1997)
+          lambda = 315614.d0/TK
+          alpha_B = 2.753d-14*(lambda**(1.5))/(1+(lambda/2.74)**0.407)**(2.242) ![cm3/s]
+          LyaEm = prob_case_B * alpha_B * n_e * nhii * e_lya ! [erg/cm3/s]
+          ! convert Lya to Ha using a simple ratio ... 
+          HaEm(j) = LyaEm / conv_factor
+          
+       end do
+    else
+       print*,'Not implemented ... '
+       stop
+    end if
+    
+  end subroutine ramses_get_HaEmiss_HIDopwidth
+
 
   ! Return, nHI, nHeI, nHeII in cells ------------------------------------
   subroutine ramses_get_nhi_nhei_nehii_cgs(repository,snapnum,nleaf,nvar  &
@@ -2613,122 +1847,6 @@ contains
     return
 
   end subroutine ramses_get_nh_nhi_nhei_nehii_cgs
-
-
-  subroutine ramses_get_T_nFeII_cgs(repository,snapnum,nleaf,nvar,ramses_var,temp,nFeII)
-
-    implicit none 
-
-    character(1000),intent(in)            :: repository
-    integer(kind=4),intent(in)            :: snapnum
-    integer(kind=4),intent(in)            :: nleaf, nvar
-    real(kind=8),intent(in)               :: ramses_var(nvar,nleaf) ! one cell only
-    real(kind=8),intent(inout)            :: nFeII(nleaf), temp(nleaf)
-    real(kind=8),allocatable              :: boost(:)
-    integer(kind=4)                       :: ihx,ihy,i
-    real(kind=8)                          :: xx,yy,dxx1,dxx2,dyy1,dyy2,f
-    integer(kind=4)                       :: if1,if2,jf1,jf2
-    real(kind=8),allocatable,dimension(:) :: mu, nh
-
-    ! get conversion factors if necessary
-    if (.not. conversion_scales_are_known) then 
-       call read_conversion_scales(repository,snapnum)
-       conversion_scales_are_known = .True.
-    end if
-
-    if(ramses_rt)then
-       ! ramses RT
-       allocate(mu(1:nleaf))
-       mu   = XH * (1.d0+ramses_var(ihii,:)) + 0.25d0*(1.d0-XH)*(1.d0 + ramses_var(iheii,:) + 2.d0*ramses_var(iheiii,:)) ! assumes no metals
-       mu   = 1.0d0 / mu
-       temp = ramses_var(itemp,:) / ramses_var(1,:) * dp_scale_T2                ! T/mu [ K ]
-       temp = temp * mu                                                      ! This is now T (in K) with no bloody mu ... 
-       deallocate(mu)
-    else
-       ! ramses standard
-       if (.not. cooling_is_read) then
-          call read_cooling(repository,snapnum)
-          cooling_is_read = .True.
-       end if
-       allocate(nh(nleaf))
-       nh   = ramses_var(1,:) * dp_scale_nh  ! nb of H atoms per cm^3
-       temp = ramses_var(itemp,:) / ramses_var(1,:) * dp_scale_T2  ! T/mu [ K ]
-       allocate(boost(nleaf))
-       if (self_shielding) then
-          do i=1,nleaf
-             boost(i)=MAX(exp(-nh(i)/0.01),1.0D-20) ! same as hard-coded in RAMSES. 
-          end do
-       else
-          boost = 1.0d0
-       end if
-       ! compute the ionization state and temperature using the 'cooling' tables
-       do i = 1, nleaf
-          xx  = min(max(log10(nh(i)/boost(i)),cooling%nh(1)),cooling%nh(cooling%n11))
-          ihx = int((xx - cool_int%nh_start)/cool_int%nh_step) + 1
-          if (ihx < 1) then 
-             ihx = 1 
-          else if (ihx > cool_int%n_nh) then
-             ihx = cool_int%n_nh
-          end if
-          yy  = log10(temp(i))
-          ihy = int((yy - cool_int%t2_start)/cool_int%t2_step) + 1
-          if (ihy < 1) then 
-             ihy = 1 
-          else if (ihy > cool_int%n_t2) then
-             ihy = cool_int%n_t2
-          end if
-          ! 2D linear interpolation:
-          if (ihx < cool_int%n_nh) then 
-             dxx1  = max(xx - cooling%nh(ihx),0.0d0) / cool_int%nh_step 
-             dxx2  = min(cooling%nh(ihx+1) - xx,cool_int%nh_step) / cool_int%nh_step
-             if1  = ihx
-             if2  = ihx+1
-          else
-             dxx1  = 0.0d0
-             dxx2  = 1.0d0
-             if1  = ihx
-             if2  = ihx
-          end if
-          if (ihy < cool_int%n_t2) then 
-             dyy1  = max(yy - cooling%t2(ihy),0.0d0) / cool_int%t2_step
-             dyy2  = min(cooling%t2(ihy+1) - yy,cool_int%t2_step) / cool_int%t2_step
-             jf1  = ihy
-             jf2  = ihy + 1
-          else
-             dyy1  = 0.0d0
-             dyy2  = 1.0d0
-             jf1  = ihy
-             jf2  = ihy
-          end if
-          if (abs(dxx1+dxx2-1.0d0) > 1.0d-6 .or. abs(dyy1+dyy2-1.0d0) > 1.0d-6) then 
-             write(*,*) 'Fucked up the interpolation ... '
-             print*,dxx1+dxx2,dyy1+dyy2
-             stop
-          end if
-          ! GET MU to convert T/MU into T ... 
-          f = dxx1 * dyy1 * cooling%mu(if2,jf2) + dxx2 * dyy1 * cooling%mu(if1,jf2) &
-               & + dxx1 * dyy2 * cooling%mu(if2,jf1) + dxx2 * dyy2 * cooling%mu(if1,jf1)
-          temp(i) = temp(i) * f   ! This is now T (in K) with no bloody mu ... 
-       end do
-       deallocate(boost,nh)
-    endif       
-    
-    ! from T, we can compute the FeII fraction as 100% between 9.1704362 d+4 K and 1.87983 d+5 K, and 0% elsewhere.
-    ! (These limits correspond to the following ionisation energies:
-    ! - Fe - Fe+   : 7.9024678 ev = 1,1215236d-18 J  (NIST data)
-    ! - Fe+ - Fe++ : 16.19920 eV = 2,56348d-18 J (NIST data)
-    do i = 1,nleaf
-       if (temp(i) >= 9.1704362d4 .and. temp(i) <= 1.87983d5) then
-          nFeII(i) = ramses_var(1,i) * dp_scale_d * ramses_var(imetal,i) * dp_scale_zsun * abundance_Fe_number   ! [#/cm3]
-       else
-          nFeII(i) = 0.0d0
-       end if
-    end do
-    
-    return
-
-  end subroutine ramses_get_T_nFeII_cgs
-
 
 
 
@@ -3390,7 +2508,7 @@ contains
     dp_scale_d    = get_param_real(repository,snapnum,'unit_d')
     dp_scale_t    = get_param_real(repository,snapnum,'unit_t')
     dp_scale_nH   = XH/mp * dp_scale_d      ! convert mass density (code units) to numerical density of H atoms [/cm3]
-    dp_scale_nHe  = (1d0-XH)/4.0d0/mp * dp_scale_d ! mass dens to He/cm3
+    dp_scale_nHe  = (1d0-XH)/4/mp * dp_scale_d ! mass dens to He/cm3
     dp_scale_v    = dp_scale_l/dp_scale_t   ! -> converts velocities into cm/s
     dp_scale_T2   = mp/kB * dp_scale_v**2   ! -> converts P/rho to T/mu, in K
     dp_scale_zsun = 1.d0/0.0127     
@@ -3539,26 +2657,27 @@ contains
   ! STARS utilities 
 
 
-  subroutine ramses_read_stars_in_domain(repository,snapnum,selection_domain,star_pos_all,star_age_all,star_mass_all,star_vel_all,star_met_all)
+  subroutine ramses_read_stars_in_domain(repository,snapnum,selection_domain,star_pos,star_age,star_minit,star_mass,star_vel,star_met, ncpu_read, cpu_list)
 
     !$ use OMP_LIB
 
     implicit none
 
     character(1000),intent(in)             :: repository
-    integer(kind=4),intent(in)             :: snapnum
+    integer(kind=4),intent(in)             :: snapnum, ncpu_read
+    integer(kind=4),allocatable,intent(in) :: cpu_list(:)  
     type(domain),intent(in)                :: selection_domain
-    real(kind=8),allocatable               :: star_pos(:,:),star_age(:),star_mass(:),star_vel(:,:),star_met(:)
-    real(kind=8),allocatable,intent(inout) :: star_pos_all(:,:),star_age_all(:),star_mass_all(:),star_vel_all(:,:),star_met_all(:)
+    real(kind=8),allocatable,intent(inout) :: star_pos(:,:),star_age(:),star_minit(:),star_mass(:),star_vel(:,:),star_met(:)
+    real(kind=8),allocatable               :: star_pos_all(:,:),star_age_all(:),star_minit_all(:),star_mass_all(:),star_vel_all(:,:),star_met_all(:)
     integer(kind=4)                        :: nstars
     real(kind=8)                           :: omega_0,lambda_0,little_h,omega_k,H0
     real(kind=8)                           :: aexp,stime,time_cu,boxsize
-    integer(kind=4)                        :: ncpu,ilast,icpu,npart,i,ifield,nfields
+    integer(kind=4)                        :: ilast,icpu,npart,i,ifield,nfields
     character(1000)                        :: filename
     integer(kind=4),allocatable            :: id(:)
     real(kind=8),allocatable               :: age(:),m(:),x(:,:),v(:,:),mets(:),imass(:)
     real(kind=8)                           :: temp(3)
-    integer(kind=4)                        :: rank, iunit, ilast_all
+    integer(kind=4)                        :: rank, iunit, ilast_all, k
     
     ! get cosmological parameters to convert conformal time into ages
     call read_cosmo_params(repository,snapnum,omega_0,lambda_0,little_h)
@@ -3583,13 +2702,13 @@ contains
        write(*,*)'boxlen =',boxsize
     endif
 
-    ! read stars 
-    nstars = get_tot_nstars(repository,snapnum)
+    ! read stars
+    nstars = get_tot_nstars_cpu_list(repository,snapnum,ncpu_read,cpu_list)
     if (nstars == 0) then
-       write(*,*) 'ERROR : no star particles in output '
+       write(*,*) 'ERROR : no star particles in domain '
        stop
     end if
-    allocate(star_pos_all(3,nstars),star_age_all(nstars),star_mass_all(nstars),star_vel_all(3,nstars),star_met_all(nstars))
+    allocate(star_pos_all(3,nstars),star_age_all(nstars),star_minit_all(nstars),star_mass_all(nstars),star_vel_all(3,nstars),star_met_all(nstars))
     ! get list of particle fields in outputs 
     call get_fields_from_header(repository,snapnum,nfields)
     ncpu  = get_ncpu(repository,snapnum)
@@ -3597,12 +2716,15 @@ contains
 
 !$OMP PARALLEL &
 !$OMP DEFAULT(private) &
-!$OMP SHARED(ncpu, repository, snapnum, ParticleFields, nfields, selection_domain) &
+!$OMP SHARED(ncpu_read, repository, snapnum, ParticleFields, nfields, selection_domain) &
 !$OMP SHARED(h0, stime, dp_scale_t, dp_scale_m, dp_scale_v, boxsize, time_cu, aexp) &
-!$OMP SHARED(cosmo, use_initial_mass, use_proper_time) &
-!$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_mass_all, star_met_all)
+!!!!  !!!$OMP SHARED(cosmo, use_initial_mass, use_proper_time) &
+!$OMP SHARED(cosmo, use_proper_time) &
+!$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_minit_all, star_mass_all, star_met_all)
 !$OMP DO
-    do icpu = 1, ncpu
+    do k=1,ncpu_read
+       icpu=cpu_list(k)
+       
        rank = 1
        !$ rank = OMP_GET_THREAD_NUM()
        iunit=10+rank*2
@@ -3637,6 +2759,8 @@ contains
              read(iunit) id(1:npart)
           case('level')
              read(iunit)
+          case('family')
+             read(iunit)
           case('tform')
              read(iunit) age(1:npart)
           case('metal')
@@ -3654,7 +2778,7 @@ contains
           x=x/boxsize
        endif
 
-       allocate(star_pos(3,npart),star_age(npart),star_mass(npart),star_vel(3,npart),star_met(npart))
+       allocate(star_pos(3,npart),star_age(npart),star_minit(npart),star_mass(npart),star_vel(3,npart),star_met(npart))
        ! save star particles within selection region
        ilast = 0
        do i = 1,npart
@@ -3673,11 +2797,12 @@ contains
                    ! convert from tborn to age in Myr
                    star_age(ilast)   = max(0.d0, (time_cu - age(i)) * dp_scale_t / (365.d0*24.d0*3600.d0*1.d6))
                 endif
-                if (use_initial_mass) then 
-                   star_mass(ilast) = imass(i) * dp_scale_m ! [g]
-                else
-                   star_mass(ilast) = m(i)     * dp_scale_m ! [g]
-                end if
+                star_mass(ilast) = m(i) * dp_scale_m
+               ! if (use_initial_mass) then 
+                star_minit(ilast) = imass(i) * dp_scale_m ! [g]
+               ! else
+                 !  star_minit(ilast) = m(i)     * dp_scale_m ! [g]
+                !end if
                 star_pos(:,ilast) = x(i,:)              ! [code units]
                 star_vel(:,ilast) = v(i,:) * dp_scale_v ! [cm/s]
                 star_met(ilast) = mets(i) 
@@ -3690,6 +2815,7 @@ contains
 !$OMP CRITICAL
        if(ilast .gt. 0) then
           star_age_all(ilast_all:ilast_all+ilast-1) = star_age(1:ilast)
+          star_minit_all(ilast_all:ilast_all+ilast-1) = star_minit(1:ilast)
           star_mass_all(ilast_all:ilast_all+ilast-1) = star_mass(1:ilast)
           star_pos_all(1:3,ilast_all:ilast_all+ilast-1) = star_pos(1:3,1:ilast)
           star_vel_all(1:3,ilast_all:ilast_all+ilast-1) = star_vel(1:3,1:ilast)
@@ -3698,7 +2824,7 @@ contains
        ilast_all = ilast_all + ilast
 !$OMP END CRITICAL
 
-    deallocate(star_age,star_pos,star_vel,star_met,star_mass)
+    deallocate(star_age,star_pos,star_vel,star_met,star_mass,star_minit)
 
     enddo
 !$OMP END DO
@@ -3708,45 +2834,36 @@ contains
     ! resize star arrays
     nstars = ilast_all-1
     print*,'-- ramses_read_stars_in_domain: Nstars in domain =',nstars
+
     ! ages
     allocate(star_age(nstars))
     star_age(:) = star_age_all(1:nstars)
     deallocate(star_age_all)
-    allocate(star_age_all(nstars))
-    star_age_all(:) = star_age(:)
-    deallocate(star_age)
+
     ! masses
-    allocate(star_mass(nstars))
+    allocate(star_minit(nstars),star_mass(nstars))
+    star_minit(:) = star_minit_all(1:nstars)
     star_mass(:) = star_mass_all(1:nstars)
-    deallocate(star_mass_all)
-    allocate(star_mass_all(nstars))
-    star_mass_all(:) = star_mass(:)
-    deallocate(star_mass)
+    deallocate(star_minit_all,star_mass_all)
+
     ! positions
     allocate(star_pos(3,nstars))
-    do i = 1,nstars 
-       star_pos(:,i) = star_pos_all(:,i)
+    do i = 1,3
+       star_pos(i,:) = star_pos_all(i,1:nstars)
     end do
     deallocate(star_pos_all)
-    allocate(star_pos_all(3,nstars))
-    star_pos_all(:,:) = star_pos(:,:)
-    deallocate(star_pos)
+
     ! velocities
     allocate(star_vel(3,nstars))
-    do i = 1,nstars 
-       star_vel(:,i) = star_vel_all(:,i)
+    do i = 1,3 
+       star_vel(i,:) = star_vel_all(i,1:nstars)
     end do
     deallocate(star_vel_all)
-    allocate(star_vel_all(3,nstars))
-    star_vel_all(:,:) = star_vel(:,:)
-    deallocate(star_vel)
+
     ! metals
     allocate(star_met(nstars))
     star_met(:) = star_met_all(1:nstars)
     deallocate(star_met_all)
-    allocate(star_met_all(nstars))
-    star_met_all(:) = star_met(:)
-    deallocate(star_met)
     
     return
   end subroutine ramses_read_stars_in_domain
@@ -3775,6 +2892,38 @@ contains
     return
 
   end function get_tot_nstars
+  
+  ! Val
+  function get_tot_nstars_cpu_list(dir,ts,ncpu_read,cpu_list)
+
+    implicit none 
+
+    integer(kind=4),intent(in)     :: ts, ncpu_read
+    integer,allocatable,intent(in) :: cpu_list(:)
+    character(1000),intent(in)     :: dir
+    character(2000)                :: filename
+    integer(kind=4)                :: get_tot_nstars_cpu_list, icpu, k, iunit, npart
+
+    get_tot_nstars_cpu_list = 0
+
+    do k=1,ncpu_read
+       icpu=cpu_list(k)
+
+       iunit=10
+       write(filename,'(a,a,i5.5,a,i5.5,a,i5.5)') trim(dir), '/output_', ts, '/part_', ts, '.out', icpu
+       open(unit=iunit,file=filename,status='old',form='unformatted')
+       read(iunit)
+       read(iunit)
+       read(iunit)npart
+       get_tot_nstars_cpu_list = get_tot_nstars_cpu_list + npart
+       close(iunit)
+
+    end do  
+
+  end function get_tot_nstars_cpu_list
+  ! laV
+
+  
 
   ! conformal time utils :
     function ct_conftime2time(tau)
@@ -4035,8 +3184,8 @@ contains
              read(value,*) read_rt_variables
           case ('verbose')
              read(value,*) verbose
-          case ('use_initial_mass')
-             read(value,*) use_initial_mass
+          !case ('use_initial_mass')
+          !   read(value,*) use_initial_mass
           case ('cosmo')
              read(value,*) cosmo
           case ('use_proper_time')
@@ -4051,6 +3200,8 @@ contains
              read(value,*) iheii
           case('iheiii') ! index of HeIII fraction 
              read(value,*) iheiii
+          case('deut2H_nb_ratio')
+             read(value,*) deut2H_nb_ratio
           end select
        end do
     end if
@@ -4077,7 +3228,7 @@ contains
        write(unit,'(a,L1)') '  self_shielding    = ',self_shielding
        write(unit,'(a,L1)') '  ramses_rt         = ',ramses_rt
        write(unit,'(a,L1)') '  read_rt_variables = ',read_rt_variables
-       write(unit,'(a,L1)') '  use_initial_mass  = ',use_initial_mass
+      ! write(unit,'(a,L1)') '  use_initial_mass  = ',use_initial_mass
        write(unit,'(a,L1)') '  cosmo             = ',cosmo
        write(unit,'(a,L1)') '  use_proper_time   = ',use_proper_time
        write(unit,'(a,L1)') '  verbose           = ',verbose
@@ -4086,12 +3237,13 @@ contains
        write(unit,'(a,i2)') '  ihii              = ', ihii
        write(unit,'(a,i2)') '  iheii             = ', iheii
        write(unit,'(a,i2)') '  iheiii            = ', iheiii
+       write(unit,'(a,ES10.3)')'  deut2H_nb_ratio   = ', deut2H_nb_ratio
     else
        write(*,'(a,a,a)') '[ramses]'
        write(*,'(a,L1)') '  self_shielding    = ',self_shielding
        write(*,'(a,L1)') '  ramses_rt         = ',ramses_rt
        write(*,'(a,L1)') '  read_rt_variables = ',read_rt_variables
-       write(*,'(a,L1)') '  use_initial_mass  = ',use_initial_mass
+      ! write(*,'(a,L1)') '  use_initial_mass  = ',use_initial_mass
        write(*,'(a,L1)') '  cosmo             = ',cosmo
        write(*,'(a,L1)') '  use_proper_time   = ',use_proper_time
        write(*,'(a,L1)') '  verbose           = ',verbose
@@ -4100,6 +3252,7 @@ contains
        write(*,'(a,i2)') '  ihii              = ', ihii
        write(*,'(a,i2)') '  iheii             = ', iheii
        write(*,'(a,i2)') '  iheiii            = ', iheiii
+       write(*,'(a,ES10.3)')'  deut2H_nb_ratio   = ', deut2H_nb_ratio
     end if
 
     return
@@ -4109,3 +3262,6 @@ contains
 end module module_ramses
 !==================================================================================
 !==================================================================================
+
+
+

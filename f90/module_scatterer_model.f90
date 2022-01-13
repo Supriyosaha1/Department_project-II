@@ -33,7 +33,6 @@ module module_scatterer_model
      real(kind=8),allocatable      :: nu_fluo(:)        ! Frequencies of the fluorescent channels
      real(kind=8)                  :: sigma_factor      ! Cross-section factor-> multiply by Voigt(x,a)/delta_nu_doppler to get sigma.
 
-     ! user-defined parameters - read from section [scatterer] in the parameter file 
      logical                       :: recoil       = .false.     ! if set to true, recoil effect is computed
      logical                       :: isotropic    = .true.      ! if set to true, scattering events will be isotropic
      logical                       :: core_skip    = .false.     ! if true, skip scatterings in the core of the line (as in Smith+15).
@@ -55,20 +54,20 @@ contains
     ! compute optical depth of Hydrogen over a given distance
     ! --------------------------------------------------------------------------
     ! INPUTS:
-    ! - nhi      : number density of neutral HI atoms                      [ cm^-3 ]
-    ! - vth      : thermal (+ small-scale turbulence) velocity of HI atoms [ cm / s ]
-    ! - distance_to_border_cm : distance over which we compute tau        [ cm ]
-    ! - nu_cell  : photon's frequency in the frame of the cell            [ Hz ]
+    ! - nscat                 : number density of scatterers                    [ cm^-3 ]
+    ! - vth_sq_times_m        : 2 * kb * T / amu 
+    ! - distance_to_border_cm : distance over which we compute tau              [ cm ]
+    ! - nu_cell               : photon's frequency in the frame of the cell     [ Hz ]
     ! OUTPUT :
-    ! - get_tau  : optical depth of scatterer over distance_to_border_cm
+    ! - get_tau               : optical depth of scatterer over distance_to_border_cm
     ! --------------------------------------------------------------------------
     type(scatterer),intent(in) :: s
     real(kind=8),intent(in)    :: nscat,vth_sq_times_m,vturb,distance_to_border_cm,nu_cell
-    real(kind=8)               :: dopwidth,delta_nu_doppler,x_cell,sigma,a,h_cell,get_tau
+    real(kind=8)               :: delta_nu_doppler,x_cell,sigma,a,h_cell,get_tau
 
     ! compute Doppler width and a-parameter
 
-    delta_nu_doppler = sqrt(vth_sq_times_m / s%m_ion + vturb**2*1d10) / s%lambda_cm 
+    delta_nu_doppler = sqrt(vth_sq_times_m / s%m_ion + vturb**2*1d10) / s%lambda_cm
     a = s%A_over_fourpi / delta_nu_doppler
  
     ! Cross section of scatterer
@@ -96,6 +95,7 @@ contains
     ! - k        : propagaction vector (normalized) 
     ! - nu_ext   : frequency of incoming photon, in external frame     [ Hz ]
     ! - iran     : random number generator seed
+    ! - s        : Variable de type scatterer, 
     ! OUTPUTS :
     ! - nu_cell  : updated frequency in cell's frame   [ Hz ]
     ! - nu_ext   : updated frequency in external frame [ Hz ]
@@ -126,17 +126,17 @@ contains
     real(kind=8),dimension(3)               :: knew
     integer(kind=4)                         :: i
 
-    !--CORESKIP--  sanity check ... 
-    if (.not. s%core_skip .and. xcrit .ne. 0.0d0) then
-       print*,'ERROR: core skipping is off but xcrit is not zero ... '
-       stop
-    end if
-    if (s%core_skip)  then
-       xc = min(xcrit,s%xcritmax)
-    else
-       xc=0.0d0
-    endif
-    !--PIKSEROC--
+    ! !--CORESKIP--  sanity check ... 
+    ! if (.not. s%core_skip .and. xcrit .ne. 0.0d0) then
+    !    print*,'ERROR: core skipping is off but xcrit is not zero ... '
+    !    stop
+    ! end if
+    ! if (s%core_skip)  then
+    !    xc = min(xcrit,s%xcritmax)
+    ! else
+    !    xc=0.0d0
+    ! endif
+    ! !--PIKSEROC--
 
     dopwidth = sqrt(vth_sq_times_m / s%m_ion + vturb**2*1d10)
     
@@ -329,25 +329,25 @@ contains
 
 
 
-  subroutine read_scatterer_params(pfile,s,index_call_read)
+  subroutine read_scatterer_params(sfile,pfile,s,index_call_read)
     
     ! ---------------------------------------------------------------------------------
     ! subroutine which reads parameters scatterer in the atomic parameter file pfile
     ! ---------------------------------------------------------------------------------
 
-    character(*),intent(in)       :: pfile
+    character(*),intent(in)       :: sfile,pfile
     type(scatterer),intent(inout) :: s
     integer(kind=4),intent(in)    :: index_call_read ! If 1, call read voigt and uparallel params
     character(1000)               :: line,name,value
     integer(kind=4)               :: err,i
     logical                       :: file_exists
 
-    INQUIRE(FILE=pfile, EXIST=file_exists)
+    INQUIRE(FILE=sfile, EXIST=file_exists)
     if(.not. file_exists) then
-       print*, 'File '//trim(pfile)//' does not exist, stopping the program.'
+       print*, 'File '//trim(sfile)//' does not exist, stopping the program.'
        stop
     else
-       open(unit=10,file=trim(pfile),status='old',form='formatted')
+       open(unit=10,file=trim(sfile),status='old',form='formatted')
        do
           read (10,'(a)',iostat=err) line
           if(err/=0) exit

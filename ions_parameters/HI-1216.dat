@@ -1,0 +1,9 @@
+! HI - 1215.67 line
+! Parameters taken from https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+
+m_ion     = 1d0
+name_ion  = HI
+lambda_cm = 1215.67d-8                   
+A         = 6.265d8                               
+f         = 0.416d0                 
+n_fluo    = 0

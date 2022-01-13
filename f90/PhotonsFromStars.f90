@@ -13,18 +13,37 @@ program PhotonsFromStars
   
   type(domain)             :: emission_domain
   character(2000)          :: parameter_file
-  real(kind=8),allocatable :: star_pos(:,:),star_age(:),star_mass(:),star_vel(:,:),star_met(:)
-  integer(kind=4)          :: iran,i,nstars,narg
+  real(kind=8),allocatable :: star_pos(:,:),star_age(:),star_minit(:),star_mass(:),star_vel(:,:),star_met(:)
+  integer(kind=4)          :: i,nstars,narg,iran
   real(kind=8)             :: scalar, r2, r3
   ! for analysis purposes (a posteriori weighting) we want to save the emitter-frame
   ! frequency (here the freq. in the emitting stellar particle's frame)
   real(kind=8),allocatable :: nu_star(:)
   real(kind=8)             :: total_flux
   type(SSPgrid)            :: NdotGrid
+  ! Val, to save star velocities, to fix peeling-off
+  real(kind=8),allocatable :: v_em(:,:)
+  ! Val
   real(kind=8),allocatable :: low_prob(:), low_prob2(:), nu_em(:), Ndot(:), sweight(:), lbin(:)
   real(kind=8),allocatable :: x_em(:,:), k_em(:,:), NdotStar(:,:)
   integer(kind=4)          :: ilow, iphot, iseed, ilow2
   real(kind=8)             :: lambda0, k(3), lambdamin, lambdamax, nu, spec_gauss_nu0, lambda_star, weight
+
+  real(kind=8)             :: start, finish, rate, intermed
+  integer(kind=8)          :: c1,c2,cr,c3
+
+  !Val, for powlaw, old way
+  real(kind=8),allocatable    :: sed_age(:),sed_met(:),sed_F_0(:,:),sed_beta(:,:)
+  real(kind=8),allocatable    :: star_beta(:)
+  real(kind=8)                :: f0,beta,betaplus2,r1, xage,xmet
+  real(kind=8)                :: weight_l0_Ang ! this is the lbda_0 above or the monochromatic or line-center wavelength, and is read from weight file 
+  integer(kind=4)             :: imet,iage,sed_nage,sed_nmet
+  character(2000)             :: nphotperpacket
+  real(kind=8)                :: xmin,xmax,ymin,ymax,zmin,zmax
+  
+  integer(kind=4),allocatable :: cpu_list(:)
+  integer(kind=4)             :: ncpu_read
+  !laV
   
   ! --------------------------------------------------------------------------
   ! user-defined parameters - read from section [PhotonsFromStars] of the parameter file
@@ -33,11 +52,14 @@ program PhotonsFromStars
   character(2000)           :: outputfile = 'PhotICs.dat' ! file to which outputs will be written
   character(2000)           :: repository = './'          ! ramses run directory (where all output_xxxxx dirs are).
   integer(kind=4)           :: snapnum = 1                ! ramses output number to use
+  ! Val
+  character(2000)           :: weight_input_file = 'F1600.txt' ! file containing weights from SEDs
+  ! laV
 
   ! --- domain whithin which star particles will be selected (should be within computational domain used for RT). 
   character(10)             :: star_dom_type      = 'sphere'         ! shape type of domain  // default is sphere.
   real(kind=8),dimension(3) :: star_dom_pos       = (/0.5,0.5,0.5/)  ! center of domain [code units]
-  real(kind=8)              :: star_dom_rsp       = 0.3              ! radius of spher [code units]
+  real(kind=8)              :: star_dom_rsp       = 0.3              ! radius of sphere [code units]
   real(kind=8)              :: star_dom_size      = 0.3              ! size of cube [code units]
   real(kind=8)              :: star_dom_rin       = 0.0              ! inner radius of shell [code units]
   real(kind=8)              :: star_dom_rout      = 0.3              ! outer radius of shell [code units]
@@ -62,17 +84,26 @@ program PhotonsFromStars
   ! parameters for spec_type == 'Table'
   real(kind=8)              :: spec_table_lmin_Ang = 1120.      ! min wavelength to sample
   real(kind=8)              :: spec_table_lmax_Ang = 1320.      ! max ...
+  ! parameters for spec_type == 'Flat'
+  real(kind=8)              :: spec_flat_lmin_Ang = 1120.      ! min wavelength to sample
+  real(kind=8)              :: spec_flat_lmax_Ang = 1320.      ! max ...
   
   ! --- miscelaneous
-  integer(kind=4)           :: nphotons = 1000000      ! number of photons to generate
-  integer(kind=4)           :: ranseed  = -100         ! seed for random generator
-  logical                   :: verbose  = .true.
+  integer(kind=4)           :: nphot   = 1000000      ! number of photons to generate
+  integer(kind=4)           :: ranseed = -100         ! seed for random generator
+  logical                   :: verbose = .true.
   ! --- parameters for star particles/feedback in simulation
   logical                   :: recompute_particle_initial_mass = .false.
   real(kind=8)              :: tdelay_SN = 10.        ! [Myr] SNs go off at tdelay_SN ... 
   real(kind=8)              :: recyc_frac = 0.8       ! correct for recycling ... we want the mass of stars formed ...
   
   ! --------------------------------------------------------------------------
+
+
+  call cpu_time(start)
+  call system_clock(count_rate=cr)
+  rate = float(cr)
+  call system_clock(c1)
   
   
   ! -------------------- read parameters --------------------
@@ -112,8 +143,22 @@ program PhotonsFromStars
   ! read star particles within domain
   ! --------------------------------------------------------------------------------------
   if (verbose) write(*,*) 'Reading star particles'
-  call ramses_read_stars_in_domain(repository,snapnum,emission_domain,star_pos,star_age,star_mass,star_vel,star_met)
+
+  ! Val
+  ! Copying the method of CDD, to open only the relevant CPU files and not the full box
+  xmax = star_dom_pos(1) + star_dom_rsp
+  xmin = star_dom_pos(1) - star_dom_rsp
+  ymax = star_dom_pos(2) + star_dom_rsp
+  ymin = star_dom_pos(2) - star_dom_rsp
+  zmax = star_dom_pos(3) + star_dom_rsp
+  zmin = star_dom_pos(3) - star_dom_rsp
+
+  call get_cpu_list_periodic(repository, snapnum, xmin,xmax,ymin,ymax,zmin,zmax, ncpu_read, cpu_list)
+  
+  call ramses_read_stars_in_domain(repository,snapnum,emission_domain,star_pos,star_age,star_minit,star_mass,star_vel,star_met, ncpu_read, cpu_list)
+  ! laV
   ! --------------------------------------------------------------------------------------
+
   
   
   print*,'Nstars read =',size(star_mass)
@@ -122,87 +167,139 @@ program PhotonsFromStars
   print*,'minmax mass =',minval(star_mass),maxval(star_mass)
   print*,'minmax age =',minval(star_age),maxval(star_age)
   print*,'minmax met =',minval(star_met),maxval(star_met)
+
+  deallocate(star_mass)
+
+  
+  call cpu_time(intermed)
+  call system_clock(c2)
+  print '(" --> Done with Reading stars. Elapsed time = ",f12.3," seconds.")',intermed-start
+  print '("                               system_clock time = ",f12.3," seconds.")',(c2-c1)/rate
+  print*,' '
   
   
   ! --------------------------------------------------------------------------------------
   ! Compute luminosity/spectrum for each star-particles
   ! --------------------------------------------------------------------------------------
-  
-  
-  call init_ssp_lib(spec_SSPdir)
+  ! Val powlaw
+  if(trim(spec_type) /= 'PowLaw') call init_ssp_lib(spec_SSPdir)
+  !call init_ssp_lib(spec_SSPdir)
+  ! laV powlaw
   
   select case(trim(spec_type))
 !--------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------
   case('PowLaw')
-     print*,'Not implemented yet...'
-     stop
-     
-     ! steps
-     ! 1/ linear fit -> get grid of (Fo,Beta) = f(age,met)
-     ! 2/ integrate this to get NdotGrid
-     ! 3/ age-Z interpolation to get NdotStar
-     ! 4/ draw emitting stars from the weights
-     ! 5/ draw frequency?
-     
-     
-!--------------------------------------------------------------------------------------
-!--------------------------------------------------------------------------------------
-  case('Gauss')
+     ! Val powlaw
 
-     print*,'Gauss spectral type'
-     lambda0 = spec_gauss_lambda0
-     call ssp_lib_extract_subset(lambda0, lambda0, NdotGrid)  ! charge les SEDs si pas deja fait, et extrait les flux a weight_l0_Ang
-     ! -> def le nb phots (at weight_l0_Ang) per sec, per solar mass -> dans un objet class_twod_table (nAge, nZ, 1)
-     print*,spec_gauss_lambda0, lambda0
-     spec_gauss_nu0 = clight / (lambda0*1e-8) ! Hz
-     
-     ! compute the nb of photons per second emitted by each star particle
-     allocate(Ndot(1))
-     nstars = size(star_age)
-     allocate(sweight(nstars))
-     do i = 1,nstars
-        !print*,i,star_age(i), star_age(i)/1.e3, log10(star_met(i))
-        call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot)    ! Ndot number of photons / s / A / Msun
-        sweight(i) = Ndot(1) * star_mass(i) / msun  ! M_sun
-        if(recompute_particle_initial_mass)then
-           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
-              sweight(i) = sweight(i)/recyc_frac   ! correct for recycling ... we want the mass of stars formed ...
-           end if
-        end if
+     ! read weight files (tables generated from e.g. Bruzual & Charlot models)
+     open(unit=15,file=weight_input_file,status='old',form='formatted')
+     read(15,*) ! skip header
+     read(15,*) ! skip header
+     read(15,*) ! skip header
+     read(15,*) sed_nage,sed_nmet
+     allocate(sed_age(sed_nage),sed_met(sed_nmet))
+     read(15,*) sed_age ! in Myr
+     read(15,*) sed_met ! metallicities (absolute)
+
+     read(15,*) weight_l0_Ang  ! ref. wavelength in A
+     allocate(sed_F_0(sed_nage,sed_nmet),sed_beta(sed_nage,sed_nmet))
+     do imet = 1,sed_nmet
+        read(15,*) sed_F_0(:,imet)  ! normalisation of power law (in erg/s/A/Msun)
+        read(15,*) sed_beta(:,imet) ! slope of power law
      end do
 
-     ! calcul pour chaque particule la luminosite inferieure de son bin dans la distribution cumulative.. 
+     ! compute the weight of each star particle
+     nstars = size(star_age)
+     allocate(sweight(nstars))
+     allocate(star_beta(nstars))
+
+     do i = 1,nstars
+        ! pick SED with closest metallicity and age
+        call locate_age_Z(sed_met,sed_nmet,sed_age,sed_nage,star_met(i),star_age(i),xmet,xage,imet,iage)
+        f0   = xage*xmet*sed_F_0(iage,imet) + xage*(1d0-xmet)*sed_F_0(iage,imet+1) + (1d0-xage)*xmet*sed_F_0(iage+1,imet) + (1d0-xage)*(1d0-xmet)*sed_F_0(iage+1,imet+1)
+        beta = xage*xmet*sed_beta(iage,imet) + xage*(1d0-xmet)*sed_beta(iage,imet+1) + (1d0-xage)*xmet*sed_beta(iage+1,imet) + (1d0-xage)*(1d0-xmet)*sed_beta(iage+1,imet+1)
+
+        sweight(i) = star_minit(i) / msun  ! M_sun
+
+        ! integrate powerlaw from min to max wavelengths.
+        ! We actually want to sample the number of photons per lambda bin.
+        ! Given that F_lbda = F_0 (lbda / lbda_0)**beta (in erg/s/A),
+        ! the number of photons (in /s/A) is N_lbda = F_0*lbda_0/hc * (lbda/lbda_0)**(1+beta).
+        ! (NB: the first lbda_0 here has to be in cm)
+        ! This integrates to (in #/s) :
+        ! (F_0 lbda_0 / hc) * lbda_0/(beta+2)  * [ (lbda_max/lbda_0)**(2+beta) - (lbda_min/lbda_0)**(2+beta)]
+        ! (NB: the first lbda_0 here is in cm, the second in A). 
+        ! OR, if beta == -2, the integral is
+        ! (F_0*lbda_0/hc) * lbda_0 * ln(lbda_max/lbda_min)     [again, first lbda_0 in cm, second in A]
+        if (beta == -2.0d0) then
+           sweight(i) = sweight(i) * (f0*weight_l0_Ang*1e-8/planck/clight)
+           sweight(i) = sweight(i) * weight_l0_Ang * log(spec_powlaw_lmax_Ang/spec_powlaw_lmin_Ang)
+        else
+           sweight(i) = sweight(i) * (f0*weight_l0_Ang*1e-8*weight_l0_Ang/planck/clight/(2.+beta))
+           sweight(i) = sweight(i) * ( (spec_powlaw_lmax_Ang/weight_l0_Ang)**(2.+beta) - (spec_powlaw_lmin_Ang/weight_l0_Ang)**(2.+beta) )
+        end if
+        ! -> sweight is the number of photons in [lbda_min;lbda_max]
+        star_beta(i) = beta ! keep for later.
+     end do
+
+     ! --------------------------------------------------------------------------------------
+     ! define linear sampling of number of photons 
+     ! --------------------------------------------------------------------------------------
      ! compute the total number of photons emitted per second by the sources
      call compute_cum_low_prob(nstars, sweight, low_prob, total_flux)
      if (verbose) write(*,*) 'Total luminosity (nb of photons per second): ',total_flux
-
-     ! for each photon packet, draw the emitting star
-     allocate(x_em(1:3,1:nphotons), k_em(1:3,1:nphotons), nu_em(1:nphotons), nu_star(1:nphotons))
-
+     
+     
+     ! --------------------------------------------------------------------------------------
+     ! Now we can draw integers from 1 to nflux and assign photons to stars according to spectral shape.
+     ! --------------------------------------------------------------------------------------
+     allocate(x_em(1:3,1:nphot), k_em(1:3,1:nphot), nu_em(1:nphot), nu_star(1:nphot), v_em(1:3,1:nphot))
      iseed = ranseed
-     do iphot = 1,nphotons
+     do iphot = 1,nphot
 
         call binary_search(iseed, nstars, low_prob, ilow)
-        ! draw photon's ICs from star ilow
+
+        ! photon emitted from star ilow
         ! give photon the position of the star
-        x_em(:,iphot) = star_pos(:,ilow) 
+        x_em(:,iphot) = star_pos(:,ilow)
+        v_em(:,iphot) = star_vel(:,ilow)
         ! draw propagation direction
         call isotropic_direction(k,iseed)
         k_em(:,iphot) = k
-        ! compute frequency in star frame using the Box-Muller method
-        r2 = ran3(iran)
-        r3 = ran3(iran)
-        nu = sqrt(-2.*log(r2)) * cos(2.0d0*pi*r3)
-        nu = (spec_gauss_sigma_kms * 1d5 * spec_gauss_nu0 / clight) * nu + spec_gauss_nu0
-        nu_star(iphot) =  nu    ! clight / (lambda0*1e-8)  ! Hz
-        ! compute frequency in external frame 
-        scalar = k(1)*star_vel(1,ilow) + k(2)*star_vel(2,ilow) + k(3)*star_vel(3,ilow)
-        nu_em(iphot)  = nu_star(iphot) / (1d0 - scalar/clight)
+
+        ! compute frequency in star frame
+
+        ! sample F_lbda = F_0 (lbda / lbda_0)**beta (in erg/s/A) ...
+        ! -> we actually want to sample the nb of photons : N_lbda = F_lbda * lbda / (hc) = F_0*lbda_0/(h*c) * (lbda/lbda_0)**(beta+1)
+        ! FOR BETA /= 2 : 
+        ! -> the probability of drawing a photon with l in [lbda_min;lbda] is:
+        !      P(<lbda) = (lbda**(2+beta) - lbda_min**(2+beta))/(lbda_max**(2+beta)-lbda_min**(2+beta))
+        ! -> and thus for a random number x in [0,1], we get
+        !      lbda = [ lbda_min**(2+beta) + x * ( lbda_max**(2+beta) - lbda_min**(2+beta) ) ]**(1/(2+beta))
+        ! FOR BETA == 2:
+        ! -> the probability of drawing a photon with l in [lbda_min;lbda] is:
+        !      P(<lbda) = log(lbda/lbda_min) / log(lbda_max/lbda_min)
+        ! -> and thus for a random number x in [0,1], we get
+        !      lbda = lbda_min * exp[ x * log(lbda_max/lbda_min)] 
+        r1   = ran3(iseed)
+        if (star_beta(ilow) == -2.0d0) then
+           nu = spec_powlaw_lmin_Ang * exp(r1 * log(spec_powlaw_lmax_Ang / spec_powlaw_lmin_Ang) ) ! this is lbda [A]
+           nu = clight / (nu*1e-8) ! this is freq. [Hz]
+        else
+           betaplus2 = star_beta(ilow) + 2.0d0
+           nu   = (spec_powlaw_lmin_Ang**betaplus2 + r1 * (spec_powlaw_lmax_Ang**betaplus2 - spec_powlaw_lmin_Ang**betaplus2))**(1./betaplus2) ! this is lbda [A]
+           nu   = clight / (nu*1e-8) ! this is freq. [Hz]
+        end if
+        nu_star(iphot) = nu  ! star-particle-frame frequency
+        ! now put in external frame using particle's velocity. 
+        scalar = k_em(1,iphot)*star_vel(1,ilow) + k_em(2,iphot)*star_vel(2,ilow) + k_em(3,iphot)*star_vel(3,ilow)
+        nu_em(iphot) = nu / (1d0 - scalar/clight)
      end do
 
-     
-!--------------------------------------------------------------------------------------
+     ! laV powlaw
+
+     !--------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------
   case('Table')
      !print*,'Not implemented yet...'
@@ -211,7 +308,7 @@ program PhotonsFromStars
      print*,'Table spectral type'
      lambdamin = spec_table_lmin_Ang
      lambdamax = spec_table_lmax_Ang
-     call ssp_lib_extract_subset(lambdamin,lambdamax,NdotGrid) ! extract the SSP age-met grid of Nphotons in lambda range [lambdamin;lambdamax]
+     call ssp_lib_extract_subset(lambdamin,lambdamax,NdotGrid) ! extract the SSP age-met grid of Nphot in lambda range [lambdamin;lambdamax]
      allocate(Ndot(NdotGrid%nlambda))
      
      ! compute the nb of photons per second emitted by each star particle
@@ -222,7 +319,7 @@ program PhotonsFromStars
      do i = 1,nstars
         ! interpolate NdotGrid(lambda)
         call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot)
-        Ndot = Ndot * star_mass(i) / msun  ! nb of photons / s / A
+        Ndot = Ndot * star_minit(i) / msun  ! nb of photons / s / A
         if(recompute_particle_initial_mass)then
            if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
               Ndot = Ndot/recyc_frac               ! correct for recycling ... we want the mass of stars formed ...
@@ -240,7 +337,7 @@ program PhotonsFromStars
      if (verbose) write(*,*) 'Total luminosity (nb of photons per second): ',total_flux
      
      ! for each photon packet, draw the emitting star
-     allocate(x_em(1:3,1:nphotons), k_em(1:3,1:nphotons), nu_em(1:nphotons), nu_star(1:nphotons))
+     allocate(x_em(1:3,1:nphot), k_em(1:3,1:nphot), nu_em(1:nphot), nu_star(1:nphot), v_em(1:3,1:nphot))
      allocate(low_prob2(NdotGrid%nlambda+1))
      iseed = ranseed
 
@@ -252,14 +349,24 @@ program PhotonsFromStars
      enddo
      lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda)
 
-     do iphot = 1,nphotons
+     ! TK---
+     ! do i = 1,NdotGrid%nlambda-1
+     !    lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
+     ! enddo
+     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda) + (NdotGrid%lambda(i) - NdotGrid%lambda(i-1))/2.0d0
+     ! TK---
+
+     do iphot = 1,nphot
 
         call binary_search(iseed, nstars, low_prob, ilow)
 
         ! photon emitted from star ilow
         ! give photon the position of the star
         !print*,iphot,ilow
-        x_em(:,iphot) = star_pos(:,ilow) 
+        x_em(:,iphot) = star_pos(:,ilow)
+        ! Val
+        v_em(:,iphot) = star_vel(:,ilow)
+        ! Val
         ! draw propagation direction
         call isotropic_direction(k,iseed)
         k_em(:,iphot) = k
@@ -290,6 +397,64 @@ program PhotonsFromStars
         scalar = k(1)*star_vel(1,ilow) + k(2)*star_vel(2,ilow) + k(3)*star_vel(3,ilow)
         nu_em(iphot)  = nu_star(iphot) / (1d0 - scalar/clight)
      enddo
+
+!--------------------------------------------------------------------------------------
+!--------------------------------------------------------------------------------------
+  case('Gauss')
+
+     print*,'Gauss spectral type'
+     lambda0 = spec_gauss_lambda0
+     call ssp_lib_extract_subset(lambda0, lambda0, NdotGrid)  ! charge les SEDs si pas deja fait, et extrait les flux a weight_l0_Ang
+     ! -> def le nb phots (at weight_l0_Ang) per sec, per solar mass -> dans un objet class_twod_table (nAge, nZ, 1)
+     print*,spec_gauss_lambda0, lambda0
+     spec_gauss_nu0 = clight / (lambda0*1e-8) ! Hz
+     
+     ! compute the nb of photons per second emitted by each star particle
+     allocate(Ndot(1))
+     nstars = size(star_age)
+     allocate(sweight(nstars))
+     do i = 1,nstars
+        !print*,i,star_age(i), star_age(i)/1.e3, log10(star_met(i))
+        call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot)    ! Ndot number of photons / s / A / Msun
+        sweight(i) = Ndot(1) * star_minit(i) / msun  ! M_sun
+        if(recompute_particle_initial_mass)then
+           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
+              sweight(i) = sweight(i)/recyc_frac   ! correct for recycling ... we want the mass of stars formed ...
+           end if
+        end if
+     end do
+
+     ! calcul pour chaque particule la luminosite inferieure de son bin dans la distribution cumulative.. 
+     ! compute the total number of photons emitted per second by the sources
+     call compute_cum_low_prob(nstars, sweight, low_prob, total_flux)
+     if (verbose) write(*,*) 'Total luminosity (nb of photons per second): ',total_flux
+
+     ! for each photon packet, draw the emitting star
+     allocate(x_em(1:3,1:nphot), k_em(1:3,1:nphot), nu_em(1:nphot), nu_star(1:nphot), v_em(1:3,1:nphot))
+
+     iseed = ranseed
+     do iphot = 1,nphot
+
+        call binary_search(iseed, nstars, low_prob, ilow)
+        ! draw photon's ICs from star ilow
+        ! give photon the position of the star
+        x_em(:,iphot) = star_pos(:,ilow)
+        ! Val
+        v_em(:,iphot) = star_vel(:,ilow)
+        ! Val
+        ! draw propagation direction
+        call isotropic_direction(k,iseed)
+        k_em(:,iphot) = k
+        ! compute frequency in star frame using the Box-Muller method
+        r2 = ran3(iran)
+        r3 = ran3(iran)
+        nu = sqrt(-2.*log(r2)) * cos(2.0d0*pi*r3)
+        nu = (spec_gauss_sigma_kms * 1d5 * spec_gauss_nu0 / clight) * nu + spec_gauss_nu0
+        nu_star(iphot) =  nu    ! clight / (lambda0*1e-8)  ! Hz
+        ! compute frequency in external frame 
+        scalar = k(1)*star_vel(1,ilow) + k(2)*star_vel(2,ilow) + k(3)*star_vel(3,ilow)
+        nu_em(iphot)  = nu_star(iphot) / (1d0 - scalar/clight)
+     end do
      
 
 ! --------------------------------------------------------------------------------------
@@ -309,7 +474,7 @@ program PhotonsFromStars
      do i = 1,nstars
         !print*,i,star_age(i), star_age(i)/1.e3, log10(star_met(i))
         call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot) ! Ndot number of photons / s / A / Msun
-        sweight(i) = Ndot(1) * star_mass(i) / msun  ! number of photons / s / A
+        sweight(i) = Ndot(1) * star_minit(i) / msun  ! number of photons / s / A
         if(recompute_particle_initial_mass)then
            if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
               sweight(i) = sweight(i)/recyc_frac   ! correct for recycling ... we want the mass of stars formed ...
@@ -323,17 +488,20 @@ program PhotonsFromStars
      if (verbose) write(*,*) 'Total luminosity (nb of photons per second): ',total_flux
      
      ! for each photon packet, draw the emitting star
-     allocate(x_em(1:3,1:nphotons), k_em(1:3,1:nphotons), nu_em(1:nphotons), nu_star(1:nphotons))
+     allocate(x_em(1:3,1:nphot), k_em(1:3,1:nphot), nu_em(1:nphot), nu_star(1:nphot), v_em(1:3,1:nphot))
 
      iseed = ranseed
-     do iphot = 1,nphotons
+     do iphot = 1,nphot
 
         call binary_search(iseed, nstars, low_prob, ilow)
         ! draw photon's ICs from star ilow
 
         ! give photon the position of the star
         !print*,iphot,ilow
-        x_em(:,iphot) = star_pos(:,ilow) 
+        x_em(:,iphot) = star_pos(:,ilow)
+        ! Val
+        v_em(:,iphot) = star_vel(:,ilow)
+        ! Val
         ! draw propagation direction
         call isotropic_direction(k,iseed)
         k_em(:,iphot) = k
@@ -343,6 +511,99 @@ program PhotonsFromStars
         scalar = k(1)*star_vel(1,ilow) + k(2)*star_vel(2,ilow) + k(3)*star_vel(3,ilow)
         nu_em(iphot)  = nu_star(iphot) / (1d0 - scalar/clight)
      end do
+
+     !--------------------------------------------------------------------------------------
+!--------------------------------------------------------------------------------------
+  case('Flat')
+     !print*,'Not implemented yet...'
+     !stop
+
+     print*,'Flat spectral type'
+     lambdamin = spec_flat_lmin_Ang
+     lambdamax = spec_flat_lmax_Ang
+     call ssp_lib_extract_subset(lambdamin,lambdamax,NdotGrid) ! extract the SSP age-met grid of Nphot in lambda range [lambdamin;lambdamax]
+     allocate(Ndot(NdotGrid%nlambda))
+     
+     ! compute the nb of photons per second emitted by each star particle
+     nstars = size(star_age)
+     allocate(sweight(nstars))
+     ! need to store Ndot for each star into NdotStar
+     allocate(NdotStar(nstars,NdotGrid%nlambda))
+     do i = 1,nstars
+        ! interpolate NdotGrid(lambda)
+        call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot)
+        Ndot = Ndot * star_minit(i) / msun  ! nb of photons / s / A
+        if(recompute_particle_initial_mass)then
+           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
+              Ndot = Ndot/recyc_frac               ! correct for recycling ... we want the mass of stars formed ...
+           end if
+        end if
+        NdotStar(i,:) = Ndot(:)
+        ! integrate nphotPerSecPerMsun(nlambda)
+        call ssp_lib_integrate(NdotGrid%lambda, Ndot, NdotGrid%nlambda, weight)
+        sweight(i) = weight
+     enddo
+     
+     ! calcul pour chaque particule la luminosite inferieure de son bin dans la distribution cumulative.. 
+     ! compute the total number of photons emitted per second by the sources
+     call compute_cum_low_prob(nstars, sweight, low_prob, total_flux)
+     if (verbose) write(*,*) 'Total luminosity (nb of photons per second): ',total_flux
+     
+     ! for each photon packet, draw the emitting star
+     allocate(x_em(1:3,1:nphot), k_em(1:3,1:nphot), nu_em(1:nphot), nu_star(1:nphot), v_em(1:3,1:nphot))
+     allocate(low_prob2(NdotGrid%nlambda+1))
+     iseed = ranseed
+
+     ! compute lbin
+     allocate(lbin(NdotGrid%nlambda))
+     lbin(1) = NdotGrid%lambda(1)
+     do i = 2,NdotGrid%nlambda-1
+        lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
+     enddo
+     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda)
+
+     do iphot = 1,nphot
+
+        call binary_search(iseed, nstars, low_prob, ilow)
+
+        ! photon emitted from star ilow
+        ! give photon the position of the star
+        !print*,iphot,ilow
+        x_em(:,iphot) = star_pos(:,ilow)
+        ! Val
+        v_em(:,iphot) = star_vel(:,ilow)
+        ! Val
+        ! draw propagation direction
+        call isotropic_direction(k,iseed)
+        k_em(:,iphot) = k
+
+        ! compute frequency in star frame...
+
+        ! ! 1/ find the frequency/lambda bin
+        ! low_prob2(1) = 0.0d0
+        ! low_prob2(2) = NdotStar(ilow,1) * (NdotGrid%lambda(2) - NdotGrid%lambda(1))/2.  ! => P(lambda(1)
+        ! do i = 3,NdotGrid%nlambda
+        !    low_prob2(i) = low_prob2(i-1) + NdotStar(ilow,i-1) * (NdotGrid%lambda(i) - NdotGrid%lambda(i-2))/2.
+        ! end do
+        ! low_prob2 = low_prob2 / low_prob2(NdotGrid%nlambda)
+        ! low_prob2(NdotGrid%nlambda+1) = 1.1  ! higher than upper limit 
+        ! call binary_search(iseed, NdotGrid%nlambda, low_prob2, ilow2)
+        ! ! photon emitted in the bin ilow2;ilow2+1
+        ! ! => photon emitted at Ndot(ilow2), which means lambda between lambda(ilow2)+lambda(ilow2-1)/2. and  lambda(ilow2+1)+lambda(ilow2)/2. 
+        ! ! if ilow2 = 1 => lambda between lambda(1) and  lambda(2)+lambda(1)/2.
+        ! ! if ilow2 = nlambda => lambda between lambda(ilow2)+lambda(ilow2-1)/2. and lambda(ilow2)
+        
+        ! ! 2/ get lamba_em
+        ! ! 0th order solution is a flat distribution in this bin
+        
+        r2 = ran3(iseed)
+        lambda_star = spec_flat_lmin_Ang + r2*(spec_flat_lmax_Ang - spec_flat_lmin_Ang)
+        
+        nu_star(iphot) = clight / (lambda_star*1e-8) ! Hz
+        ! compute frequency in external frame 
+        scalar = k(1)*star_vel(1,ilow) + k(2)*star_vel(2,ilow) + k(3)*star_vel(3,ilow)
+        nu_em(iphot)  = nu_star(iphot) / (1d0 - scalar/clight)
+     enddo
 
   end select
 !--------------------------------------------------------------------------------------
@@ -356,16 +617,25 @@ program PhotonsFromStars
      write(*,*) 'Writing file: ',trim(outputfile)
      write(*,*) ' '
   endif
+  ! Val: The additional file with "_nphots" can be used to read the outputs of the peeling-off, without the need to transfer the whole, heavy, initial conditions of stars
+  write(nphotperpacket,'(a,a)') trim(outputfile),'_nphots'
+  open(unit=14, file=trim(nphotperpacket), status='unknown', form='unformatted', action='write')
+  write(14) nphot
+  write(14) total_flux
+  close(14)
   open(unit=14, file=trim(outputfile), status='unknown', form='unformatted', action='write')
-  write(14) nphotons    ! nb of MC photons = nb of photon packets
-  write(14) total_flux  ! nb of real photons (per sec).
+  write(14) nphot      ! nb of MC photons 
+  write(14) total_flux ! nb of real photons (per sec).
   write(14) ranseed
-  write(14) (i,i=1,nphotons) ! ID
-  write(14) (nu_em(i),i=1,nphotons)
-  write(14) (x_em(:,i),i=1,nphotons)
-  write(14) (k_em(:,i),i=1,nphotons)
-  write(14) (-i,i=1,nphotons) ! seeds
-  write(14) (nu_star(i),i=1,nphotons)
+  write(14) (i,i=1,nphot) ! ID
+  write(14) (nu_em(i),i=1,nphot)
+  write(14) (x_em(:,i),i=1,nphot)
+  write(14) (k_em(:,i),i=1,nphot)
+  write(14) (-i,i=1,nphot) ! seeds
+  write(14) (nu_star(i),i=1,nphot)
+  ! Val
+  write(14) (v_em(:,i),i=1,nphot)
+  ! Val
   close(14)
   ! --------------------------------------------------------------------------------------
 
@@ -373,13 +643,24 @@ program PhotonsFromStars
   ! --------------------------------------------------------------------------------------
   ! deallocations 
   ! --------------------------------------------------------------------------------------
-  deallocate(star_pos,star_vel,star_mass,star_age,star_met)
-  deallocate(sweight, Ndot)
+  deallocate(star_pos,star_vel,star_minit,star_age,star_met)
+  deallocate(sweight)
+  ! Val
+  if(trim(spec_type) /= 'PowLaw') deallocate(Ndot)
+  ! laV
   deallocate(nu_star, nu_em, x_em, k_em)
   ! --------------------------------------------------------------------------------------
 
+
+  call cpu_time(finish)
+  print '(" --> Done with PhotonStars. Total elapsed time = ",f12.3," seconds.")',finish-start
+  call system_clock(c3)
+  print '("                               system_clock time = ",f12.3," seconds.")',(c3-c1)/rate
+  print*,' '
+
   
 contains
+    
 
   subroutine compute_cum_low_prob(n, weight, low_prob, cumtot)
     
@@ -515,8 +796,12 @@ contains
              read(value,*) spec_table_lmin_Ang
           case ('spec_table_lmax_Ang')
              read(value,*) spec_table_lmax_Ang
-          case ('nPhotonPackets')
-             read(value,*) nphotons
+          case ('spec_flat_lmin_Ang')
+             read(value,*) spec_flat_lmin_Ang
+          case ('spec_flat_lmax_Ang')
+             read(value,*) spec_flat_lmax_Ang
+          case ('nphot')
+             read(value,*) nphot
           case ('ranseed')
              read(value,*) ranseed
           case ('verbose')
@@ -527,6 +812,10 @@ contains
              read(value,*) tdelay_SN
           case ('recyc_frac')
              read(value,*) recyc_frac
+          ! Val
+          case ('weight_input_file')
+             write(weight_input_file,'(a)') trim(value)
+          ! laV
           case default
              write(*,'(a,a,a)') '> WARNING: parameter ',trim(name),' unknown '
           end select
@@ -580,14 +869,18 @@ contains
           write(unit,'(a,ES10.3,a)')     '  spec_gauss_lambda0    = ',spec_gauss_lambda0,   ' ! [A]'
           write(unit,'(a,ES10.3,a)')     '  spec_gauss_sigma_kms  = ',spec_gauss_sigma_kms, ' ! [km/s]'
        case('PowLaw')
+          write(unit,'(a,a)')            '  weight_input_file       = ',trim(weight_input_file)
           write(unit,'(a,es10.3,a)')     '  spec_powlaw_lmin_Ang    = ',spec_powlaw_lmin_Ang, ' ! [A]' 
           write(unit,'(a,es10.3,a)')     '  spec_powlaw_lmax_Ang    = ',spec_powlaw_lmax_Ang, ' ! [A]'
        case('Table')
           write(unit,'(a,es10.3,a)')     '  spec_table_lmin_Ang    = ',spec_table_lmin_Ang, ' ! [A]' 
           write(unit,'(a,es10.3,a)')     '  spec_table_lmax_Ang    = ',spec_table_lmax_Ang, ' ! [A]'
+       case('Flat')
+          write(unit,'(a,es10.3,a)')     '  spec_flat_lmin_Ang     = ',spec_flat_lmin_Ang, ' ! [A]' 
+          write(unit,'(a,es10.3,a)')     '  spec_flat_lmax_Ang     = ',spec_flat_lmax_Ang, ' ! [A]'
        end select
        write(unit,'(a)')             '# miscelaneous parameters'
-       write(unit,'(a,i8)')          '  nPhotonPackets  = ',nphotons
+       write(unit,'(a,i8)')          '  nphot           = ',nphot
        write(unit,'(a,i8)')          '  ranseed         = ',ranseed
        write(unit,'(a,L1)')          '  verbose         = ',verbose
        write(unit,'(a,L1)')          '  recompute_particle_initial_mass = ',recompute_particle_initial_mass
@@ -629,14 +922,18 @@ contains
           write(*,'(a,ES10.3,a)')     '  spec_gauss_lambda0      = ',spec_gauss_lambda0, ' ! [A]'
           write(*,'(a,es10.3,a)')     '  spec_gauss_sigma_kms    = ',spec_gauss_sigma_kms, ' ! [km/s]'
        case('PowLaw')
+          write(*,'(a,a)')            '  weight_input_file       = ',trim(weight_input_file)
           write(*,'(a,es10.3,a)')     '  spec_powlaw_lmin_Ang    = ',spec_powlaw_lmin_Ang, ' ! [A]' 
           write(*,'(a,es10.3,a)')     '  spec_powlaw_lmax_Ang    = ',spec_powlaw_lmax_Ang, ' ! [A]'
        case('Table')
           write(*,'(a,es10.3,a)')     '  spec_table_lmin_Ang     = ',spec_table_lmin_Ang, ' ! [A]' 
           write(*,'(a,es10.3,a)')     '  spec_table_lmax_Ang     = ',spec_table_lmax_Ang, ' ! [A]'
+       case('Flat')
+          write(*,'(a,es10.3,a)')     '  spec_flat_lmin_Ang     = ',spec_flat_lmin_Ang, ' ! [A]' 
+          write(*,'(a,es10.3,a)')     '  spec_flat_lmax_Ang     = ',spec_flat_lmax_Ang, ' ! [A]'
        end select
        write(*,'(a)')             '# miscelaneous parameters'
-       write(*,'(a,i8)')          '  nPhotonPackets  = ',nphotons
+       write(*,'(a,i8)')          '  nphot           = ',nphot
        write(*,'(a,i8)')          '  ranseed         = ',ranseed
        write(*,'(a,L1)')          '  verbose         = ',verbose
        write(*,'(a,L1)')          '  recompute_particle_initial_mass = ',recompute_particle_initial_mass

@@ -1,10 +1,13 @@
 module module_parallel_mpi
 
   use mpi
+  ! GATHER -- 
   use module_photon
+  ! -- GATHER
   !--PEEL-- 
   use module_mock
   !--LEEP--
+
 
   implicit none
 
@@ -17,15 +20,14 @@ module module_parallel_mpi
   integer(kind=4),dimension(MPI_STATUS_SIZE)      :: status
 
   ! define a MPI derived type for photons
-  integer(kind=4),parameter                       :: nbloc=10
+  ! Val-
+  integer(kind=4),parameter                       :: nbloc=11
+  ! -Val
   integer(kind=4),dimension(nbloc)                :: types, longueurs_blocs
   integer(kind=MPI_ADDRESS_KIND),dimension(nbloc) :: deplacements, adresses
   integer(kind=MPI_ADDRESS_KIND)                  :: lb,extent,nextelement,lbound,asize
   integer(kind=4)                                 :: mpi_type_photon,temp
 
-  !--PEEL--
-  public :: master_receives_mock, send_mock_to_master
-  !--LEEP-- 
 
 contains
 
@@ -69,14 +71,15 @@ contains
     call MPI_ABORT(MPI_COMM_WORLD,error,code)
 
   end subroutine stop_mpi
-
-
+  
 
   subroutine define_mpi_type
     ! Create an MPI datatype for sending photons
 
     integer(kind=4)      :: i
+    ! Val-
     type(photon_current),dimension(10) :: p
+    ! -Val
 
     ! type photon_current
     !    integer(kind=4)           :: ID
@@ -99,13 +102,18 @@ contains
          MPI_DOUBLE_PRECISION, &
          MPI_DOUBLE_PRECISION, &
          MPI_DOUBLE_PRECISION, &
+         ! Val-
+         MPI_DOUBLE_PRECISION, &
+         ! -Val
          MPI_INTEGER, &
          MPI_DOUBLE_PRECISION, &
          MPI_DOUBLE_PRECISION, &
          MPI_INTEGER /)
 
     ! block lengths
-    longueurs_blocs = (/1,1,3,3,1,3,1,1,1,1/)
+    ! Val-
+    longueurs_blocs = (/1,1,3,3,1,3,3,1,1,1,1/)
+    ! -Val
   
     call MPI_GET_ADDRESS(p(1)%id,           adresses(1),code)
     call MPI_GET_ADDRESS(p(1)%status,       adresses(2),code)
@@ -113,10 +121,13 @@ contains
     call MPI_GET_ADDRESS(p(1)%xcurr,        adresses(4),code)
     call MPI_GET_ADDRESS(p(1)%nu_ext,       adresses(5),code)
     call MPI_GET_ADDRESS(p(1)%k,            adresses(6),code)
-    call MPI_GET_ADDRESS(p(1)%nb_abs,       adresses(7),code)
-    call MPI_GET_ADDRESS(p(1)%time,         adresses(8),code)
-    call MPI_GET_ADDRESS(p(1)%tau_abs_curr, adresses(9),code)
-    call MPI_GET_ADDRESS(p(1)%iran,         adresses(10),code)
+    ! Val-
+    call MPI_GET_ADDRESS(p(1)%v_em,         adresses(7),code)
+    call MPI_GET_ADDRESS(p(1)%nb_abs,       adresses(8),code)
+    call MPI_GET_ADDRESS(p(1)%time,         adresses(9),code)
+    call MPI_GET_ADDRESS(p(1)%tau_abs_curr, adresses(10),code)
+    call MPI_GET_ADDRESS(p(1)%iran,         adresses(11),code)
+    ! -Val
 
     ! Compute array of displacements
     do i=1,nbloc
@@ -147,8 +158,7 @@ contains
 
   end subroutine define_mpi_type
 
-
-
+  
   subroutine test_mpi_type
     ! With some hardware and/or MPI libs we had problem with MPI_TYPE_CREATE_STRUCT.
     ! This routine tests the correct behaviour of MPI with the type mpi_type_photon used in rascas.
@@ -168,6 +178,9 @@ contains
        p_test(i)%xcurr = (/0.1*i,0.2*i,0.3*i/)
        p_test(i)%nu_ext = 1216.
        p_test(i)%k = (/0.,0.,1./)
+       ! Val-
+       p_test(i)%v_em = (/0.,0.,10000000./)
+       ! -Val
        p_test(i)%nb_abs = 100*i
        p_test(i)%time = 1.23456789 * i
        p_test(i)%tau_abs_curr = 0.
@@ -177,7 +190,7 @@ contains
     ! Send p_test from 0 to 1
     if (rank == 0) then
        call MPI_SEND(p_test(1)%id, 10, MPI_TYPE_PHOTON, 1, tag , MPI_COMM_WORLD, code)
-    endif
+    end if
     if (rank == 1) then
        call MPI_RECV(temp_p(1)%id, 10, MPI_TYPE_PHOTON, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, IERROR)
        do i=1,10
@@ -191,6 +204,11 @@ contains
           do j=1,3
              if(p_test(i)%k(j) /= temp_p(i)%k(j)) stop 'problem with MPI type'
           enddo
+          ! Val-
+          do j=1,3
+             if(p_test(i)%v_em(j) /= temp_p(i)%v_em(j)) stop 'problem with MPI type'
+          enddo
+          ! -Val
           if(p_test(i)%nb_abs /= temp_p(i)%nb_abs) stop 'problem with MPI type'
           if(p_test(i)%time /= temp_p(i)%time) stop 'problem with MPI type'
           if(p_test(i)%tau_abs_curr /= temp_p(i)%tau_abs_curr) stop 'problem with MPI type'
@@ -198,6 +216,7 @@ contains
        enddo
     endif
   end subroutine test_mpi_type
+
 
   !--PEEL--
   subroutine send_mock_to_master(idcpu)
@@ -209,11 +228,14 @@ contains
     n = idcpu
     print*,'cpu ',idcpu,' is sending info ... '
     call MPI_SEND(n, 1, MPI_INTEGER, 0, tag , MPI_COMM_WORLD, code)
-
+    
     do idir = 1,nDirections
        ! flux
-       call MPI_SEND(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
-       call MPI_SEND(mock(idir)%flux, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
+       call MPI_SEND(mock(idir)%compute_flux, 1, MPI_LOGICAL, 0, tag , MPI_COMM_WORLD, code)
+       if (mock(idir)%compute_flux) then
+          call MPI_SEND(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
+          call MPI_SEND(mock(idir)%flux, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
+       end if
        ! spectrum
        call MPI_SEND(mock(idir)%compute_spectrum, 1, MPI_LOGICAL, 0, tag , MPI_COMM_WORLD, code)
        if (mock(idir)%compute_spectrum) then 
@@ -271,9 +293,12 @@ contains
     
     do idir = 1,nDirections
        ! flux
-       call MPI_RECV(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
-       call MPI_RECV(flux, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
-       mock(idir)%flux = mock(idir)%flux + flux
+       call MPI_RECV(mock(idir)%compute_flux, 1, MPI_LOGICAL, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
+       if (mock(idir)%compute_flux) then
+          call MPI_RECV(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
+          call MPI_RECV(flux, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
+          mock(idir)%flux = mock(idir)%flux + flux
+       end if
        ! spectrum
        call MPI_RECV(mock(idir)%compute_spectrum, 1, MPI_LOGICAL, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
        if (mock(idir)%compute_spectrum) then
@@ -319,6 +344,8 @@ contains
     
   end subroutine master_receives_mock
   !--LEEP--
+
+  
   
 end module module_parallel_mpi
 

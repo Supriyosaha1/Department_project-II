@@ -9,7 +9,7 @@ SYSTYPE="macP"
 #SYSTYPE="ccage"
 #SYSTYPE="horizon"
 
-OPTIONS = -cpp -fopenmp
+OPTIONS = -cpp # -fopenmp
 OPTIONS += -DDISPLAY_PROGRESS_PERCENT
 
 
@@ -52,7 +52,7 @@ endif
 
 ifeq ($(SYSTYPE),"macP")
 F90         = mpif90 #-openmpi-gcc8
-FFLAGS      = -g -ffree-line-length-none -fbounds-check -fbacktrace #-fcheck=all -Wall -ftrapv -ffree-form
+FFLAGS      = -g -ffree-line-length-none -fbounds-check -fbacktrace -fcheck=all -Wall -ftrapv -ffree-form
 #FFLAGS      = -O3
 FFLAGS += $(OPTIONS)
 LDFLAGS     = #-lmpi
@@ -78,36 +78,6 @@ endif
 
 #############################################################################
 # All objects
-
-# choose the gas mix you want to use
-# 1/ HI, D, and dust
-#COMPOBJS = module_dust_model.o module_D_1215_model.o module_HI_1216_model.o module_gas_composition_HI_D_dust.o
-# 2/ HI and dust
-#COMPOBJS = module_dust_model.o module_HI_1216_model.o module_gas_composition_HI_dust.o
-# 3/ pure HI
-#COMPOBJS = module_HI_1216_model.o module_gas_composition_HI.o
-# 4/ pure RAMSES hydro variables
-#COMPOBJS = module_gas_composition_ramses.o
-# 5/ SiII 1190/1193
-#COMPOBJS = module_SiII_1190_model.o module_SiII_1193_model.o module_gas_composition_SiII_1190_1193.o
-# 6/ SiII 1190/1193 and dust
-#COMPOBJS = module_dust_model.o module_SiII_1190_model.o module_SiII_1193_model.o module_gas_composition_SiII_1190_1193_dust.o
-# 7/ MgII
-#COMPOBJS = module_MgII_2796_model.o module_MgII_2804_model.o module_gas_composition_MgII.o
-# 8/ MgII and dust
-#COMPOBJS = module_dust_model.o module_MgII_2796_model.o module_MgII_2804_model.o module_gas_composition_MgII_dust.o
-# 9/ FeII UV1
-#COMPOBJS = module_FeII_2587_model.o module_FeII_2600_model.o module_gas_composition_FeII_UV1.o
-# 10/ FeII UV1 and dust
-#COMPOBJS = module_dust_model.o module_FeII_2587_model.o module_FeII_2600_model.o module_gas_composition_FeII_UV1_dust.o
-# 11/ SiII 1260
-#COMPOBJS = module_SiII_1260_model.o module_gas_composition_SiII_1260.o
-# 12/ SiII 1260 and dust
-#COMPOBJS = module_dust_model.o module_SiII_1260_model.o module_gas_composition_SiII_1260_dust.o
-# 13/ pure dust
-#COMPOBJS = module_dust_model.o module_gas_composition_dust.o
-# 14/ HI, HeI, HeII -> WARNING, this is for fesc measurements only ! 
-#COMPOBJS = module_gas_composition_HI_HeI_HeII.o
 COMPOBJS = module_dust_model.o module_scatterer_model.o module_gas_composition.o
 
 

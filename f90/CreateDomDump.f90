@@ -16,7 +16,6 @@ program CreateDomDump
   real(kind=8),dimension(:,:),allocatable  :: x_leaf, xleaf_sel
   real(kind=8),dimension(:,:),allocatable  :: ramses_var
   ! --- ions ---
-  ! real(kind=8),dimension(:,:),allocatable  :: metal_density
   character(10),allocatable                :: metal_ion_names(:)
   ! --- snoi ---
   integer,dimension(:),allocatable         :: leaf_level, leaflevel_sel, ind_sel
@@ -83,6 +82,8 @@ program CreateDomDump
   if (verbose) call print_CreateDomDump_params
   ! ------------------------------------------------------------
 
+  call get_metal_ion_names(metal_ion_names)
+
   ! Define the computational domain. This domain describes the volume in which photons fly.
   select case(comput_dom_type)
   case('sphere')
@@ -130,8 +131,7 @@ program CreateDomDump
         cpu_list(i)=i
      end do
      
-     call ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level)
-     !call ramses_get_leaf_cells_slomp(repository, snapnum, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level)
+     call ramses_get_leaf_cells(repository, snapnum, metal_number, krome_data_dir, metal_ion_names, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level)
      
      ! Extract and convert properties of cells into gas mix properties
      call gas_from_ramses_leaves(repository,snapnum,nleaftot,nvar,ramses_var, gas_leaves)
@@ -261,8 +261,7 @@ program CreateDomDump
         end select
 
         call get_cpu_list_periodic(repository, snapnum, xmin,xmax,ymin,ymax,zmin,zmax, ncpu_read, cpu_list)
-        call get_metal_ion_names(metal_ion_names)
-        call ramses_get_leaf_cells_metals(repository, snapnum, metal_number, krome_data_dir, metal_ion_names, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level)
+        call ramses_get_leaf_cells(repository, snapnum, metal_number, krome_data_dir, metal_ion_names, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level)
 
         if(verbose) write(*,*)'In CreateDomDump: nleaf_sel = ',nleaftot, size(leaf_level)
         ! Extract and convert properties of cells into gas mix properties
@@ -295,7 +294,7 @@ program CreateDomDump
         end do
         !call ramses_get_leaf_cells_in_domain_slomp(repository, snapnum, domain_list(i), ncpu_read, cpu_list, &
         !     & nleaftot, nvar, x_leaf, ramses_var, leaf_level)
-        call ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, &
+        call ramses_get_leaf_cells(repository, snapnum, metal_number, krome_data_dir, metal_ion_names, ncpu_read, cpu_list, &
              & nleaftot, nvar, x_leaf, ramses_var, leaf_level, domain_list(i))
         print*,'in CreateDomDump: nleaf_sel = ',nleaftot, size(leaf_level)
         ! Extract and convert properties of cells into gas mix properties
@@ -352,7 +351,7 @@ program CreateDomDump
         call get_cpu_list_periodic(repository, snapnum, xmin,xmax,ymin,ymax,zmin,zmax, ncpu_read, cpu_list)
         !call ramses_get_leaf_cells_in_domain_slomp(repository, snapnum, domain_list(i), ncpu_read, cpu_list, &
         !     & nleaftot, nvar, x_leaf, ramses_var, leaf_level)
-        call ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, &
+        call ramses_get_leaf_cells(repository, snapnum, metal_number, krome_data_dir, metal_ion_names, ncpu_read, cpu_list, &
              & nleaftot, nvar, x_leaf, ramses_var, leaf_level, domain_list(i))
         ! Extract and convert properties of cells into gas mix properties
         call gas_from_ramses_leaves(repository,snapnum,nleaftot,nvar,ramses_var, gas_leaves)
