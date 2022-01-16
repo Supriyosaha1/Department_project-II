@@ -89,7 +89,7 @@ OBJSPHO = $(GASOBJS) module_mesh.o module_mock.o module_photon.o
 
 OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
 
-OBJLYAFG = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o module_HI_1216_model.o
+OBJLYAFG = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o
 
 OBJFESC	= $(GASOBJS) module_mesh.o module_gray_ray.o
 
@@ -103,7 +103,7 @@ OBJFESC	= $(GASOBJS) module_mesh.o module_gray_ray.o
 	$(F90) $(FFLAGS) -c $^ -o $@
 
 #############################################################################
-all: clean CreateDomDump PhotonsFromSourceModel PhotonsFromStars rascas
+all: clean CreateDomDump PhotonsFromSourceModel PhotonsFromStars LyaPhotonsFromGas rascas
 
 PhotonsFromSourceModel: $(OBJSPHO) PhotonsFromSourceModel.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) PhotonsFromSourceModel.o
