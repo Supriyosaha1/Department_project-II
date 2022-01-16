@@ -105,22 +105,27 @@ contains
   ! ----------------
 
 
-  subroutine ramses_get_leaf_cells(repository, snapnum, metal_number, krome_data_dir, ions, ncpu_read, cpu_list, &
-       & nleaftot, nvar, xleaf_all, ramses_var_all, leaf_level_all, selection_domain)
+  subroutine ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, &
+       & nleaftot, nvar, xleaf_all, ramses_var_all, leaf_level_all, metal_number, krome_data_dir, ions, selection_domain)
     ! non-openMP method, as in minirats...
     ! no subroutine, store cell data directly into final arrays
     
     implicit none 
-    character(2000),intent(in)                :: repository, krome_data_dir
-    integer(kind=4),intent(in)                :: snapnum, ncpu_read, metal_number
-    character(10),intent(in)                  :: ions(metal_number)
+    character(2000),intent(in)                :: repository
+    integer(kind=4),intent(in)                :: snapnum, ncpu_read
     integer(kind=4),allocatable,intent(in)    :: cpu_list(:)    
     integer(kind=4),intent(inout)             :: nleaftot, nvar
     real(kind=8),allocatable,intent(inout)    :: ramses_var_all(:,:)
     real(kind=8),allocatable,intent(inout)    :: xleaf_all(:,:)
     integer(kind=4),allocatable,intent(inout) :: leaf_level_all(:)
     type(domain),intent(in),optional          :: selection_domain
-    integer(kind=4)                           :: ileaf,nleaf,k,icpu,ivar,iloop,ileaf_cpu,nleaf_cpu
+    ! --- ions ---
+    character(2000),intent(in),optional       :: krome_data_dir
+    integer(kind=4),intent(in)                :: metal_number
+    character(10),intent(in),optional         :: ions(metal_number)
+    integer(kind=4)                           :: ileaf_cpu,nleaf_cpu        ! Useful to check that the number of leaf cells in the same in the Krome outputs as in Ramses outputs.
+    ! --- snoi ---
+    integer(kind=4)                           :: ileaf,nleaf,k,icpu,ivar,iloop,nmetal
     real(kind=8)                              :: time1,time2,time3,rate
     integer(kind=8)                           :: c1,c2,c3,cr
     character(1000)                           :: filename 
@@ -146,6 +151,12 @@ contains
     logical,allocatable                       :: cpu_is_useful(:)
     
     if(verbose) print *,'Reading RAMSES cells...'
+
+    if(metal_number.ne.0 .and. .not. present(krome_data_dir)) then
+       print*,'Problem, metal_number is greater than 0 but no path for krome data has been given.'
+       print*,'Stopping the program'
+       stop
+    end if
 
     call cpu_time(time1)
     call system_clock(count_rate=cr)
@@ -1196,14 +1207,14 @@ contains
   end function get_nGridTot_cpus
 
 
-  subroutine ramses_get_T_nhi_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,temp,nhi)
+  subroutine ramses_get_T_nhi_cgs(repository,snapnum,nleaf,nvar,ramses_var,temp,nhi)
 
     implicit none 
 
     character(1000),intent(in)  :: repository
     integer(kind=4),intent(in)  :: snapnum
-    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
-    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar
+    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: nhi(nleaf), temp(nleaf)
     real(kind=8),allocatable    :: boost(:)
     real(kind=8)                :: xhi
@@ -1312,14 +1323,14 @@ contains
 
   end subroutine ramses_get_T_nhi_cgs
 
-  subroutine ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,velocity_cgs)
+  subroutine ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar,ramses_var,velocity_cgs)
 
     implicit none
 
     character(1000),intent(in)  :: repository
     integer(kind=4),intent(in)  :: snapnum
-    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
-    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar
+    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: velocity_cgs(3,nleaf)
 
     ! get conversion factors if necessary
@@ -1334,14 +1345,14 @@ contains
 
   end subroutine ramses_get_velocity_cgs
 
-  subroutine ramses_get_nh_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,nh)
+  subroutine ramses_get_nh_cgs(repository,snapnum,nleaf,nvar,ramses_var,nh)
 
     implicit none
 
     character(1000),intent(in)  :: repository
     integer(kind=4),intent(in)  :: snapnum
-    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
-    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar
+    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: nh(nleaf)
 
     ! get conversion factors if necessary
@@ -1357,14 +1368,14 @@ contains
   end subroutine ramses_get_nh_cgs
   
 
-   subroutine ramses_get_deuterium(repository,snapnum,nleaf,nvar,metal_number,ramses_var,nd)
+   subroutine ramses_get_deuterium(repository,snapnum,nleaf,nvar,ramses_var,nd)
 
     implicit none
 
     character(1000),intent(in)  :: repository
     integer(kind=4),intent(in)  :: snapnum
-    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
-    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar
+    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: nd(nleaf)
 
     ! get conversion factors if necessary
@@ -1380,12 +1391,12 @@ contains
   end subroutine ramses_get_deuterium
 
 
-  subroutine ramses_get_metallicity(nleaf,nvar,metal_number,ramses_var,metallicity)
+  subroutine ramses_get_metallicity(nleaf,nvar,ramses_var,metallicity)
 
     implicit none
 
-    integer(kind=4),intent(in)  :: nleaf, nvar, metal_number
-    real(kind=8),intent(in)     :: ramses_var(nvar+metal_number,nleaf) ! one cell only
+    integer(kind=4),intent(in)  :: nleaf, nvar
+    real(kind=8),intent(in)     :: ramses_var(nvar,nleaf) ! one cell only
     real(kind=8),intent(inout)  :: metallicity(nleaf)
 
     if (nvar < 6) then

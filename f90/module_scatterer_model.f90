@@ -337,7 +337,7 @@ contains
 
     character(*),intent(in)       :: sfile,pfile
     type(scatterer),intent(inout) :: s
-    integer(kind=4),intent(in)    :: index_call_read ! If 1, call read voigt and uparallel params
+    integer(kind=4),intent(in)    :: index_call_read ! If 1, call read voigt and uparallel params, otherwise not
     character(1000)               :: line,name,value
     integer(kind=4)               :: err,i
     logical                       :: file_exists

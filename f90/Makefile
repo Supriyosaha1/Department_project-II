@@ -5,8 +5,8 @@
 #SYSTYPE="lyocral"
 #SYSTYPE="lyocralP"
 #SYSTYPE="mac"
-SYSTYPE="macP"
-#SYSTYPE="ccage"
+#SYSTYPE="macP"
+SYSTYPE="ccage"
 #SYSTYPE="horizon"
 
 OPTIONS = -cpp # -fopenmp

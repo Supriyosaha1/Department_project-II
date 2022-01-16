@@ -41,7 +41,7 @@ module module_gas_composition
   integer(kind=4)             :: nscatterer                              ! Number of scatterers in the run
   character(100),allocatable  :: scatterer_names(:)                      ! List of names of scatterer (i.e. lines)  ! Follow nomenclature of the tuto
   character(1000)             :: atomic_data_dir = '../ions_parameters/' ! directory where the atomic data files are (usually in .../rascas/ions_parameters/)
-  character(2000)             :: krome_data_dir                          ! directory where the density of metallic ions are, from the Krome runs
+  character(2000)             :: krome_data_dir  = './'                  ! directory where the density of metallic ions are, from the Krome runs
   real(kind=8)                :: f_ion           = 0.01                  ! ndust = (n_HI + f_ion*n_HII) * Z/Zsun [Laursen+09]
   real(kind=8)                :: Zref            = 0.005                 ! reference metallicity. Should be ~ 0.005 for SMC and ~ 0.01 for LMC.
   real(kind=8)                :: vturb           = 2d1                   ! Constant turbulent velocity accross the simulation,  in km/s
@@ -99,7 +99,7 @@ contains
     ! compute velocities in cm / s
     write(*,*) '-- module_gas_composition : extracting velocities from ramses '
     allocate(v(3,nleaf))
-    call ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,v)
+    call ramses_get_velocity_cgs(repository,snapnum,nleaf,nvar+metal_number,ramses_var,v)
 
     do ileaf = 1,nleaf
        g(ileaf)%v = v(:,ileaf)
@@ -109,22 +109,24 @@ contains
     ! get nHI and temperature from ramses
     write(*,*) '-- module_gas_composition : extracting nHI and T from ramses '
     allocate(T(nleaf),nhi(nleaf))
-    call ramses_get_T_nhi_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,T,nhi)
+    call ramses_get_T_nhi_cgs(repository,snapnum,nleaf,nvar+metal_number,ramses_var,T,nhi)
 
     ! get ndust (pseudo dust density from Laursen, Sommer-Larsen, Andersen 2009)
     write(*,*) '-- module_gas_composition : extracting ndust from ramses '
     allocate(metallicity(nleaf),nhii(nleaf))
-    call ramses_get_metallicity(nleaf,nvar,metal_number,ramses_var,metallicity)
+    call ramses_get_metallicity(nleaf,nvar+metal_number,ramses_var,metallicity)
 
-    call ramses_get_nh_cgs(repository,snapnum,nleaf,nvar,metal_number,ramses_var,nhii)
+    call ramses_get_nh_cgs(repository,snapnum,nleaf,nvar+metal_number,ramses_var,nhii)
     nhii = nhii - nhi
     do ileaf = 1,nleaf
        g(ileaf)%ndust = metallicity(ileaf) / Zref * ( nhi(ileaf) + f_ion*nhii(ileaf) )   ! [ /cm3 ]
     end do
+    deallocate(metallicity,nhii)
 
     ! Get deuterium if needed
-    if(DI_present) call ramses_get_deuterium(repository,snapnum,nleaf,nvar,metal_number,ramses_var,ndi)
+    if(DI_present) call ramses_get_deuterium(repository,snapnum,nleaf,nvar+metal_number,ramses_var,ndi)
 
+    ! For each element, determine if it is hydrogen (or deuterium), or a metallic ion. For metallic ions, the data is stored in ramses_var, from nvar+1 to nvar+metal_number
     do i=1,element_number
        j=1
        if(name_ions_no_repetition(i) == 'HI') then
@@ -142,10 +144,12 @@ contains
           j = j+1
        end if
     end do
-
+    deallocate(nhi)
+    if(DI_present) deallocate(ndi)
 
     ! compute thermal velocity
     g(:)%vth_sq_times_m = 2d0*kb*T / amu
+    deallocate(T)
 
     ! Set turbulent velocity
     g(:)%vturb          = vturb
@@ -427,7 +431,7 @@ contains
     HI_present = .false.
     DI_present = .false.
     
-    ! The item of the list of scatterers defines the first element.
+    ! The first item of the list of scatterers defines the first element.
     element_number = 1
     allocate(scatterer_ion_index(nscatterer))
     scatterer_ion_index(1) = 1
@@ -482,6 +486,7 @@ contains
   end subroutine set_elements_index
 
 
+  ! Routine which returns a list of the names of all metallic elements, in order of appearance in the parameter file.
   subroutine get_metal_ion_names(metal_ion_names)
 
     implicit none
@@ -573,11 +578,12 @@ contains
     end if
     close(10)
 
-    ! Reading the name of the scatterers
+    ! Reading scatterer propertise
     do i=1,nscatterer
        call read_scatterer_params(trim(atomic_data_dir)//'/'//trim(scatterer_names(i))//'.dat', pfile, scatterer_list(i), i)
     end do
 
+    ! Calling a routine to compute the number of metallic ions, and others helpful variable defined at the beginning of this routine:
     call set_elements_index
 
     

@@ -662,7 +662,6 @@ contains
     read(14) (pgridinit(i)%k_em(:),i=1,n_photon)
     read(14) (pgridinit(i)%iran,i=1,n_photon)
     ! Val-
-    read(14)
     read(14) (pgridinit(i)%v_em(:),i=1,n_photon)
     ! -Val
     close(14)
