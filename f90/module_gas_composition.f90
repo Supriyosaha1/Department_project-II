@@ -428,58 +428,65 @@ contains
     integer(kind=4)              :: i,j, increment,first_index_element(100)
     logical                      :: ion_repeat, HI_present
 
-    HI_present = .false.
-    DI_present = .false.
-    
-    ! The first item of the list of scatterers defines the first element.
-    element_number = 1
-    allocate(scatterer_ion_index(nscatterer))
-    scatterer_ion_index(1) = 1
-    if(scatterer_list(1)%name_ion == 'HI') HI_present = .true.
-    if(scatterer_list(1)%name_ion == 'DI') DI_present = .true.
-    first_index_element(1) = 1
+    if(nscatterer == 0) then
+       element_number = 0
+       metal_number   = 0
+    else
 
-    increment = 1
+       HI_present = .false.
+       DI_present = .false.
 
-    ! For each line (scatterer) after the first one, checking if the corresponding ion already appeared before.
-    do i=2,nscatterer
-       if(scatterer_list(i)%name_ion == 'HI') HI_present = .true.
-       if(scatterer_list(i)%name_ion == 'DI') DI_present = .true.
-       ion_repeat = .false.
-       do j=1,i-1
-          if(scatterer_list(i)%name_ion == scatterer_list(j)%name_ion) then   ! if true, the ion of scatterer i already appeared before, for example SiII1260 - SiII1526
-             scatterer_ion_index(i) = j                                       ! assigns the ion j to the scatterer i.
-             ion_repeat = .true.
+       ! The first item of the list of scatterers defines the first element.
+       element_number = 1
+       allocate(scatterer_ion_index(nscatterer))
+       scatterer_ion_index(1) = 1
+       if(scatterer_list(1)%name_ion == 'HI') HI_present = .true.
+       if(scatterer_list(1)%name_ion == 'DI') DI_present = .true.
+       first_index_element(1) = 1
+
+       increment = 1
+
+       ! For each line (scatterer) after the first one, checking if the corresponding ion already appeared before.
+       do i=2,nscatterer
+          if(scatterer_list(i)%name_ion == 'HI') HI_present = .true.
+          if(scatterer_list(i)%name_ion == 'DI') DI_present = .true.
+          ion_repeat = .false.
+          do j=1,i-1
+             if(scatterer_list(i)%name_ion == scatterer_list(j)%name_ion) then   ! if true, the ion of scatterer i already appeared before, for example SiII1260 - SiII1526
+                scatterer_ion_index(i) = j                                       ! assigns the ion j to the scatterer i.
+                ion_repeat = .true.
+             end if
+          end do
+          ! If the ion of scatterer i never appeared, increment the number of different ions.
+          if(.not. ion_repeat) then
+             element_number = element_number + 1
+             first_index_element(1+increment) = i   ! Saving where the new element appeared in the list of scatterers
+             scatterer_ion_index(i) = 1 + increment 
+             increment = increment + 1
           end if
        end do
-       ! If the ion of scatterer i never appeared, increment the number of different ions.
-       if(.not. ion_repeat) then
-          element_number = element_number + 1
-          first_index_element(1+increment) = i   ! Saving where the new element appeared in the list of scatterers
-          scatterer_ion_index(i) = 1 + increment 
-          increment = increment + 1
+
+       if(DI_present .and. .not. HI_present) then
+          print*,'Problem, deuterium cannot be used without HI, stopping the program.'
+          stop
        end if
-    end do
-    
-    if(DI_present .and. .not. HI_present) then
-       print*,'Problem, deuterium cannot be used without HI, stopping the program.'
-       stop
+
+
+       allocate(name_ions_no_repetition(element_number))
+       do i=1,element_number
+          name_ions_no_repetition(i) = scatterer_list(first_index_element(i))%name_ion
+       end do
+
+       ! Defining metal_number
+       if(HI_present) then
+          metal_number = element_number-1
+          if(DI_present) metal_number = metal_number - 1
+       else
+          metal_number = element_number
+       end if
+
     end if
 
-    
-    allocate(name_ions_no_repetition(element_number))
-    do i=1,element_number
-       name_ions_no_repetition(i) = scatterer_list(first_index_element(i))%name_ion
-    end do
-
-    ! Defining metal_number
-    if(HI_present) then
-       metal_number = element_number-1
-       if(DI_present) metal_number = metal_number - 1
-    else
-       metal_number = element_number
-    end if
-             
 
     return
 
