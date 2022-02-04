@@ -74,7 +74,8 @@ module module_ramses
   logical                  :: read_rt_variables = .false.  ! if true, read RT variables (e.g. to compute heating terms)
   ! logical                  :: use_initial_mass  = .false.  ! if true, use initial masses of star particles instead of mass at output time
   logical                  :: cosmo             = .true.   ! if false, assume idealised simulation
-  logical                  :: use_proper_time   = .false.  ! if true, use proper time instead of conformal time for cosmo runs. 
+  logical                  :: use_proper_time   = .false.  ! if true, use proper time instead of conformal time for cosmo runs.
+  logical                  :: particle_families = .false.  ! if true, all particles have an extra family field, and the header file is different
   ! miscelaneous
   logical                  :: verbose        = .false. ! display some run-time info on this module
   ! RT variable indices
@@ -2582,6 +2583,40 @@ contains
     return
 
   end subroutine get_fields_from_header
+  
+
+  subroutine get_fields_from_descriptor(dir,ts,nfields)
+
+    implicit none
+
+    character(1000),intent(in)  :: dir
+    integer(kind=4),intent(in)  :: ts
+    integer(kind=4),intent(out) :: nfields
+    character(2000)             :: filename,line,iv,name
+    integer(kind=4)             :: i,j,err,ivar
+
+    write(filename,'(a,a,i5.5,a,i5.5,a)') trim(dir),'/output_',ts,'/part_file_descriptor.txt'
+    open(unit=50,file=filename,status='old',action='read',form='formatted')
+    nfields = 0
+    do
+       read (50,'(a)',iostat=err) line
+       if(err/=0) exit
+       ! format should be ivar, var_name, descriptor
+       i = scan(line, ',')
+       j = scan(line, ',', .true.)  ! We need the second comma
+       if(i==0 .or. line(1:1)=='#') cycle  ! skip empty/commented lines
+       name = trim(adjustl(line(i+1:j-1)))
+       iv = trim(adjustl(line(:i-1)))
+       read(iv,*) ivar
+       ParticleFields(ivar) = name
+       nfields = nfields + 1
+    end do
+    close(50)
+
+    return
+
+  end subroutine get_fields_from_descriptor
+
 
   !*****************************************************************************************************************
 
@@ -2687,6 +2722,7 @@ contains
     character(1000)                        :: filename
     integer(kind=4),allocatable            :: id(:)
     real(kind=8),allocatable               :: age(:),m(:),x(:,:),v(:,:),mets(:),imass(:)
+    integer(kind=1),allocatable            :: family(:)
     real(kind=8)                           :: temp(3)
     integer(kind=4)                        :: rank, iunit, ilast_all, k
     
@@ -2713,15 +2749,25 @@ contains
        write(*,*)'boxlen =',boxsize
     endif
 
-    ! read stars
-    nstars = get_tot_nstars_cpu_list(repository,snapnum,ncpu_read,cpu_list)
+    ! read stars 
+    if (particle_families) then
+       nstars = get_tot_nstars_families(repository, snapnum)
+    else
+       nstars = get_tot_nstars_cpu_list(repository,snapnum,ncpu_read,cpu_list)
+    end if
+
+
     if (nstars == 0) then
        write(*,*) 'ERROR : no star particles in domain '
        stop
     end if
     allocate(star_pos_all(3,nstars),star_age_all(nstars),star_minit_all(nstars),star_mass_all(nstars),star_vel_all(3,nstars),star_met_all(nstars))
-    ! get list of particle fields in outputs 
-    call get_fields_from_header(repository,snapnum,nfields)
+    ! get list of particle fields in outputs
+    if (particle_families) then
+       call get_fields_from_descriptor(repository,snapnum,nfields)
+    else
+       call get_fields_from_header(repository,snapnum,nfields)
+    end if
     ncpu  = get_ncpu(repository,snapnum)
     ilast_all = 1
 
@@ -2735,7 +2781,6 @@ contains
 !$OMP DO
     do k=1,ncpu_read
        icpu=cpu_list(k)
-       
        rank = 1
        !$ rank = OMP_GET_THREAD_NUM()
        iunit=10+rank*2
@@ -2754,30 +2799,45 @@ contains
        allocate(id(1:npart))
        allocate(mets(1:npart))
        allocate(v(1:npart,1:ndim))
+       if(particle_families) allocate(family(1:npart))
        do ifield = 1,nfields
           select case(trim(ParticleFields(ifield)))
           case('pos')
              do i = 1,ndim
                 read(iunit) x(1:npart,i)
              end do
+          case('position_x')
+             read(iunit) x(1:npart,1)
+          case('position_y')
+             read(iunit) x(1:npart,2)
+          case('position_z')
+             read(iunit) x(1:npart,3)
           case('vel')
              do i = 1,ndim 
                 read(iunit) v(1:npart,i)
              end do
+          case('velocity_x')
+             read(iunit) v(1:npart,1)
+          case('velocity_y')
+             read(iunit) v(1:npart,2)
+          case('velocity_z')
+             read(iunit) v(1:npart,3)
           case('mass')
              read(iunit) m(1:npart)
-          case('iord') 
+          case('iord','identity') 
              read(iunit) id(1:npart)
-          case('level')
+          case('level','levelp')
              read(iunit)
-          case('family')
-             read(iunit)
-          case('tform')
+          case('tform','birth_time')
              read(iunit) age(1:npart)
-          case('metal')
+          case('metal','metallicity')
              read(iunit) mets(1:npart)
           case('imass')
              read(iunit) imass(1:npart)
+          case('family')
+             read(iunit) family(1:npart)
+          case('tag','ptracegroup')
+             read(iunit)  ! Skip
           case default
              read(iunit)
              print*,'Error, Field unknown: ',trim(ParticleFields(ifield))
@@ -2808,20 +2868,17 @@ contains
                    ! convert from tborn to age in Myr
                    star_age(ilast)   = max(0.d0, (time_cu - age(i)) * dp_scale_t / (365.d0*24.d0*3600.d0*1.d6))
                 endif
-                star_mass(ilast) = m(i) * dp_scale_m
-               ! if (use_initial_mass) then 
-                star_minit(ilast) = imass(i) * dp_scale_m ! [g]
-               ! else
-                 !  star_minit(ilast) = m(i)     * dp_scale_m ! [g]
-                !end if
-                star_pos(:,ilast) = x(i,:)              ! [code units]
-                star_vel(:,ilast) = v(i,:) * dp_scale_v ! [cm/s]
-                star_met(ilast) = mets(i) 
+                star_mass(ilast)  = m(i)     * dp_scale_m
+                star_minit(ilast) = imass(i) * dp_scale_m ! [g]   
+                star_pos(:,ilast) = x(i,:)                ! [code units]
+                star_vel(:,ilast) = v(i,:)   * dp_scale_v ! [cm/s]
+                star_met(ilast)   = mets(i) 
              end if
           end if
        end do
 
        deallocate(age,m,x,id,mets,v,imass)
+       if(particle_families) deallocate(family)
 
 !$OMP CRITICAL
        if(ilast .gt. 0) then
@@ -2833,7 +2890,8 @@ contains
           star_met_all(ilast_all:ilast_all+ilast-1) = star_met(1:ilast)
        endif
        ilast_all = ilast_all + ilast
-!$OMP END CRITICAL
+       !$OMP END CRITICAL
+
 
     deallocate(star_age,star_pos,star_vel,star_met,star_mass,star_minit)
 
@@ -2933,6 +2991,36 @@ contains
 
   end function get_tot_nstars_cpu_list
   ! laV
+
+  function get_tot_nstars_families(dir, ts)
+    
+    implicit none
+
+    integer(kind=4),intent(in) :: ts
+    character(1000),intent(in) :: dir
+    character(2000)            :: filename,line,v
+    integer(kind=4)            :: i,j,err
+    integer(kind=4)            :: get_tot_nstars_families
+
+    get_tot_nstars_families = 0
+    write(filename,'(a,a,i5.5,a,i5.5,a)') trim(dir),'/output_',ts,'/header_',ts,'.txt'
+    open(unit=50,file=filename,status='old',action='read',form='formatted')
+
+    do
+       read (50,'(a)',iostat=err) line
+       if(err/=0) exit
+       i = index(line, 'star')
+       j = index(line, 'star_tracer')
+       if (i/=0 .and. j==0) then
+          ! We have found the entry with stars and not the tracer one
+          v = trim(adjustl(line(i+len('star'):)))
+          read(v,*) get_tot_nstars_families
+       end if
+    end do
+    close(50)    
+
+  end function get_tot_nstars_families
+
 
   
 
@@ -3201,6 +3289,8 @@ contains
              read(value,*) cosmo
           case ('use_proper_time')
              read(value,*) use_proper_time
+          case ('particle_families')
+             read(value,*) particle_families
           case('itemp') ! index of thermal pressure
              read(value,*) itemp
           case('imetal')! index of metallicity  
@@ -3242,6 +3332,7 @@ contains
       ! write(unit,'(a,L1)') '  use_initial_mass  = ',use_initial_mass
        write(unit,'(a,L1)') '  cosmo             = ',cosmo
        write(unit,'(a,L1)') '  use_proper_time   = ',use_proper_time
+       write(unit,'(a,L1)') '  particle_families = ',particle_families
        write(unit,'(a,L1)') '  verbose           = ',verbose
        write(unit,'(a,i2)') '  itemp             = ', itemp
        write(unit,'(a,i2)') '  imetal            = ', imetal
@@ -3257,6 +3348,7 @@ contains
       ! write(*,'(a,L1)') '  use_initial_mass  = ',use_initial_mass
        write(*,'(a,L1)') '  cosmo             = ',cosmo
        write(*,'(a,L1)') '  use_proper_time   = ',use_proper_time
+       write(*,'(a,L1)') '  particle_families = ',particle_families
        write(*,'(a,L1)') '  verbose           = ',verbose
        write(*,'(a,i2)') '  itemp             = ', itemp
        write(*,'(a,i2)') '  imetal            = ', imetal
