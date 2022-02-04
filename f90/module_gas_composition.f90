@@ -127,8 +127,8 @@ contains
     if(DI_present) call ramses_get_deuterium(repository,snapnum,nleaf,nvar+metal_number,ramses_var,ndi)
 
     ! For each element, determine if it is hydrogen (or deuterium), or a metallic ion. For metallic ions, the data is stored in ramses_var, from nvar+1 to nvar+metal_number
+    j = 1
     do i=1,element_number
-       j=1
        if(name_ions_no_repetition(i) == 'HI') then
           do ileaf = 1,nleaf
              g(ileaf)%number_density(i) = nhi(ileaf)
