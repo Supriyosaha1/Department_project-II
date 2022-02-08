@@ -124,7 +124,10 @@ contains
     deallocate(metallicity,nhii)
 
     ! Get deuterium if needed
-    if(DI_present) call ramses_get_deuterium(repository,snapnum,nleaf,nvar+metal_number,ramses_var,ndi)
+    if(DI_present) then
+       allocate(ndi(nleaf))
+       call ramses_get_deuterium(repository,snapnum,nleaf,nvar+metal_number,ramses_var,ndi)
+    end if
 
     ! For each element, determine if it is hydrogen (or deuterium), or a metallic ion. For metallic ions, the data is stored in ramses_var, from nvar+1 to nvar+metal_number
     j = 1
@@ -146,7 +149,7 @@ contains
     end do
     deallocate(nhi)
     if(DI_present) deallocate(ndi)
-
+    
     ! compute thermal velocity
     g(:)%vth_sq_times_m = 2d0*kb*T / amu
     deallocate(T)
@@ -592,7 +595,6 @@ contains
 
     ! Calling a routine to compute the number of metallic ions, and others helpful variable defined at the beginning of this routine:
     call set_elements_index
-
     
     call read_dust_params(pfile)
 

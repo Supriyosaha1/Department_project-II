@@ -13,25 +13,22 @@ program PhotonsFromStars
   
   type(domain)             :: emission_domain
   character(2000)          :: parameter_file
-  real(kind=8),allocatable :: star_pos(:,:),star_age(:),star_minit(:),star_mass(:),star_vel(:,:),star_met(:)
-  integer(kind=4)          :: i,nstars,narg,iran
+  real(kind=8),allocatable :: star_pos(:,:),star_age(:),star_minit(:),star_vel(:,:),star_met(:)
+  integer(kind=4)          :: iran,i,nstars,narg
   real(kind=8)             :: scalar, r2, r3
   ! for analysis purposes (a posteriori weighting) we want to save the emitter-frame
   ! frequency (here the freq. in the emitting stellar particle's frame)
   real(kind=8),allocatable :: nu_star(:)
   real(kind=8)             :: total_flux
   type(SSPgrid)            :: NdotGrid
-  ! Val, to save star velocities, to fix peeling-off
-  real(kind=8),allocatable :: v_em(:,:)
-  ! Val
   real(kind=8),allocatable :: low_prob(:), low_prob2(:), nu_em(:), Ndot(:), sweight(:), lbin(:)
   real(kind=8),allocatable :: x_em(:,:), k_em(:,:), NdotStar(:,:), v_em(:,:)
   integer(kind=4)          :: ilow, iphot, iseed, ilow2
   real(kind=8)             :: lambda0, k(3), lambdamin, lambdamax, nu, spec_gauss_nu0, lambda_star, weight
 
+  !JB-
   integer(kind=4),allocatable:: ncomputeperstar(:)
-  real(kind=8)             :: start, finish, rate, intermed
-  integer(kind=8)          :: c1,c2,cr,c3
+  !-JB
   
   ! --------------------------------------------------------------------------
   ! user-defined parameters - read from section [PhotonsFromStars] of the parameter file
@@ -44,7 +41,7 @@ program PhotonsFromStars
   ! --- domain whithin which star particles will be selected (should be within computational domain used for RT). 
   character(10)             :: star_dom_type      = 'sphere'         ! shape type of domain  // default is sphere.
   real(kind=8),dimension(3) :: star_dom_pos       = (/0.5,0.5,0.5/)  ! center of domain [code units]
-  real(kind=8)              :: star_dom_rsp       = 0.3              ! radius of sphere [code units]
+  real(kind=8)              :: star_dom_rsp       = 0.3              ! radius of spher [code units]
   real(kind=8)              :: star_dom_size      = 0.3              ! size of cube [code units]
   real(kind=8)              :: star_dom_rin       = 0.0              ! inner radius of shell [code units]
   real(kind=8)              :: star_dom_rout      = 0.3              ! outer radius of shell [code units]
@@ -69,28 +66,18 @@ program PhotonsFromStars
   ! parameters for spec_type == 'Table'
   real(kind=8)              :: spec_table_lmin_Ang = 1120.      ! min wavelength to sample
   real(kind=8)              :: spec_table_lmax_Ang = 1320.      ! max ...
-  ! parameters for spec_type == 'Flat'
-  real(kind=8)              :: spec_flat_lmin_Ang = 1120.      ! min wavelength to sample
-  real(kind=8)              :: spec_flat_lmax_Ang = 1320.      ! max ...
   
   ! --- miscelaneous
-  integer(kind=4)           :: nphot   = 1000000      ! number of photons to generate
-  integer(kind=4)           :: ranseed = -100         ! seed for random generator
-  logical                   :: verbose = .true.
-  ! --- parameters for star particles/feedback in simulation
-  logical                   :: recompute_particle_initial_mass = .false.
-  real(kind=8)              :: tdelay_SN = 10.        ! [Myr] SNs go off at tdelay_SN ... 
-  real(kind=8)              :: recyc_frac = 0.8       ! correct for recycling ... we want the mass of stars formed ...
-  
+  integer(kind=4)           :: nphotons = 1000000      ! number of photons to generate
+  integer(kind=4)           :: ranseed  = -100         ! seed for random generator
+  logical                   :: verbose  = .true.  
   ! --------------------------------------------------------------------------
+  
+  real(kind=8)             :: xmin,xmax,ymin,ymax,zmin,zmax
+  integer(kind=4)                          :: ncpu_read
+  integer(kind=4),dimension(:),allocatable :: cpu_list
 
 
-  call cpu_time(start)
-  call system_clock(count_rate=cr)
-  rate = float(cr)
-  call system_clock(c1)
-  
-  
   ! -------------------- read parameters --------------------
   narg = command_argument_count()
   if(narg .lt. 1)then
@@ -111,57 +98,75 @@ program PhotonsFromStars
   case('sphere')
      call domain_constructor_from_scratch(emission_domain,star_dom_type, &
           xc=star_dom_pos(1),yc=star_dom_pos(2),zc=star_dom_pos(3),r=star_dom_rsp)
+     xmax = star_dom_pos(1)+star_dom_rsp
+     ymax = star_dom_pos(2)+star_dom_rsp
+     zmax = star_dom_pos(3)+star_dom_rsp
+     xmin = star_dom_pos(1)-star_dom_rsp
+     ymin = star_dom_pos(2)-star_dom_rsp
+     zmin = star_dom_pos(3)-star_dom_rsp
   case('shell')
      call domain_constructor_from_scratch(emission_domain,star_dom_type, &
           xc=star_dom_pos(1),yc=star_dom_pos(2),zc=star_dom_pos(3),r_inbound=star_dom_rin,r_outbound=star_dom_rout)
+     xmax = star_dom_pos(1)+star_dom_rout
+     ymax = star_dom_pos(2)+star_dom_rout
+     zmax = star_dom_pos(3)+star_dom_rout
+     xmin = star_dom_pos(1)-star_dom_rout
+     ymin = star_dom_pos(2)-star_dom_rout
+     zmin = star_dom_pos(3)-star_dom_rout
   case('cube')
      call domain_constructor_from_scratch(emission_domain,star_dom_type, & 
           xc=star_dom_pos(1),yc=star_dom_pos(2),zc=star_dom_pos(3),size=star_dom_size)
+     xmax = star_dom_pos(1)+star_dom_size/2.0d0
+     ymax = star_dom_pos(2)+star_dom_size/2.0d0
+     zmax = star_dom_pos(3)+star_dom_size/2.0d0
+     xmin = star_dom_pos(1)-star_dom_size/2.0d0
+     ymin = star_dom_pos(2)-star_dom_size/2.0d0
+     zmin = star_dom_pos(3)-star_dom_size/2.0d0
   case('slab')
      call domain_constructor_from_scratch(emission_domain,star_dom_type, &
           xc=star_dom_pos(1),yc=star_dom_pos(2),zc=star_dom_pos(3),thickness=star_dom_thickness)
+     xmax = 1.0d0
+     ymax = 1.0d0
+     zmax = star_dom_pos(3)+star_dom_thickness/2.0d0
+     xmin = 0.0d0
+     ymin = 0.0d0
+     zmin = star_dom_pos(3)-star_dom_thickness/2.0d0
   end select
   ! --------------------------------------------------------------------------------------
+
   
   
   ! --------------------------------------------------------------------------------------
   ! read star particles within domain
   ! --------------------------------------------------------------------------------------
   if (verbose) write(*,*) 'Reading star particles'
-  ! Copying the method of CDD, to open only the relevant CPU files and not the full box
-  xmax = star_dom_pos(1) + star_dom_rsp
-  xmin = star_dom_pos(1) - star_dom_rsp
-  ymax = star_dom_pos(2) + star_dom_rsp
-  ymin = star_dom_pos(2) - star_dom_rsp
-  zmax = star_dom_pos(3) + star_dom_rsp
-  zmin = star_dom_pos(3) - star_dom_rsp
   call get_cpu_list_periodic(repository, snapnum, xmin,xmax,ymin,ymax,zmin,zmax, ncpu_read, cpu_list)
-  call ramses_read_stars_in_domain(repository,snapnum,emission_domain,star_pos,star_age,star_minit,star_mass,star_vel,star_met, ncpu_read, cpu_list)
-  ! --------------------------------------------------------------------------------------
-
-  print*,'Nstars read =',size(star_mass)
+  call ramses_read_stars_in_domain(repository,snapnum,emission_domain,star_pos,star_age,star_minit,star_vel,star_met, ncpu_read, cpu_list)
+  print*,'Nstars read =',size(star_minit)
   print*,'minmax pos =',minval(star_pos),maxval(star_pos)
   print*,'minmax vel =',minval(star_vel),maxval(star_vel)
-  print*,'minmax mass =',minval(star_mass),maxval(star_mass)
+  print*,'minmax mass =',minval(star_minit),maxval(star_minit)
   print*,'minmax age =',minval(star_age),maxval(star_age)
   print*,'minmax met =',minval(star_met),maxval(star_met)
+  ! --------------------------------------------------------------------------------------
 
-
-  
-  call cpu_time(intermed)
-  call system_clock(c2)
-  print '(" --> Done with Reading stars. Elapsed time = ",f12.3," seconds.")',intermed-start
-  print '("                               system_clock time = ",f12.3," seconds.")',(c2-c1)/rate
-  print*,' '
   
   
   ! --------------------------------------------------------------------------------------
   ! Compute luminosity/spectrum for each star-particles
   ! --------------------------------------------------------------------------------------
   call init_ssp_lib(spec_SSPdir)
-  
   select case(trim(spec_type))
-
+  case('PowLaw')
+     print*,'Not implemented yet...'
+     stop
+     ! steps
+     ! 1/ linear fit -> get grid of (Fo,Beta) = f(age,met)
+     ! 2/ integrate this to get NdotGrid
+     ! 3/ age-Z interpolation to get NdotStar
+     ! 4/ draw emitting stars from the weights
+     ! 5/ draw frequency?
+     
   case('Gauss')
 
      print*,'Gauss spectral type'
@@ -178,12 +183,7 @@ program PhotonsFromStars
      do i = 1,nstars
         !print*,i,star_age(i), star_age(i)/1.e3, log10(star_met(i))
         call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot)    ! Ndot number of photons / s / A / Msun
-        sweight(i) = Ndot(1) * star_mass(i) / msun  ! M_sun
-        if(recompute_particle_initial_mass)then
-           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
-              sweight(i) = sweight(i)/recyc_frac   ! correct for recycling ... we want the mass of stars formed ...
-           end if
-        end if
+        sweight(i) = Ndot(1) * star_minit(i) / msun  ! M_sun
      end do
 
      ! calcul pour chaque particule la luminosite inferieure de son bin dans la distribution cumulative.. 
@@ -237,12 +237,7 @@ program PhotonsFromStars
      do i = 1,nstars
         ! interpolate NdotGrid(lambda)
         call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot)
-        Ndot = Ndot * star_mass(i) / msun  ! nb of photons / s / A
-        if(recompute_particle_initial_mass)then
-           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
-              Ndot = Ndot/recyc_frac               ! correct for recycling ... we want the mass of stars formed ...
-           end if
-        end if
+        Ndot = Ndot * star_minit(i) / msun  ! nb of photons / s / A
         NdotStar(i,:) = Ndot(:)
         ! integrate nphotPerSecPerMsun(nlambda)
         call ssp_lib_integrate(NdotGrid%lambda, Ndot, NdotGrid%nlambda, weight)
@@ -328,17 +323,12 @@ program PhotonsFromStars
      allocate(sweight(nstars))     
 !$OMP PARALLEL &
 !$OMP DEFAULT(private) &
-!$OMP SHARED(nstars, NdotGrid, star_age, star_met, star_mass,sweight) 
+!$OMP SHARED(nstars, NdotGrid, star_age, star_met, star_minit,sweight) 
 !$OMP DO
      do i = 1,nstars
         ! interpolate NdotGrid(lambda)
         call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot)
-        Ndot = Ndot * star_mass(i) / msun  ! nb of photons / s / A
-        if(recompute_particle_initial_mass)then
-           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
-              Ndot = Ndot/recyc_frac               ! correct for recycling ... we want the mass of stars formed ...
-           end if
-        end if
+        Ndot = Ndot * star_minit(i) / msun  ! nb of photons / s / A
         ! integrate nphotPerSecPerMsun(nlambda)
         call ssp_lib_integrate(NdotGrid%lambda, Ndot, NdotGrid%nlambda, weight)
 !$OMP CRITICAL
@@ -386,12 +376,7 @@ program PhotonsFromStars
         ! compute frequency in star frame... 
         ! 0/ compute the spectrum of the star particle
         call ssp_lib_interpolate(NdotGrid, star_age(ilow)/1.e3, log10(star_met(ilow)), Ndot)
-        Ndot = Ndot * star_mass(i) / msun  ! nb of photons / s / A
-        if(recompute_particle_initial_mass)then
-           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
-              Ndot = Ndot/recyc_frac               ! correct for recycling ... we want the mass of stars formed ...
-           end if
-        end if
+        Ndot = Ndot * star_minit(i) / msun  ! nb of photons / s / A
         ncomputeperstar(ilow) = ncomputeperstar(ilow)+1
         
         ! 1/ find the frequency/lambda bin
@@ -453,12 +438,7 @@ program PhotonsFromStars
      do i = 1,nstars
         !print*,i,star_age(i), star_age(i)/1.e3, log10(star_met(i))
         call ssp_lib_interpolate(NdotGrid, star_age(i)/1.e3, log10(star_met(i)), Ndot) ! Ndot number of photons / s / A / Msun
-        sweight(i) = Ndot(1) * star_mass(i) / msun  ! number of photons / s / A
-        if(recompute_particle_initial_mass)then
-           if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
-              sweight(i) = sweight(i)/recyc_frac   ! correct for recycling ... we want the mass of stars formed ...
-           end if
-        end if
+        sweight(i) = Ndot(1) * star_minit(i) / msun  ! number of photons / s / A
       end do
      
      ! calcul pour chaque particule la luminosite inferieure de son bin dans la distribution cumulative.. 
@@ -491,8 +471,6 @@ program PhotonsFromStars
         v_em(:,iphot) = star_vel(:,ilow)
      end do
 
-  end select
-     !--------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------
   case('Flat')
      print*,'Not implemented yet...'
@@ -526,17 +504,10 @@ program PhotonsFromStars
   ! --------------------------------------------------------------------------------------
   ! deallocations 
   ! --------------------------------------------------------------------------------------
-  deallocate(star_pos,star_vel,star_mass,star_age,star_met)
+  deallocate(star_pos,star_vel,star_minit,star_age,star_met)
   deallocate(sweight, Ndot)
   deallocate(nu_star, nu_em, x_em, k_em, v_em)
   ! --------------------------------------------------------------------------------------
-
-
-  call cpu_time(finish)
-  print '(" --> Done with PhotonStars. Total elapsed time = ",f12.3," seconds.")',finish-start
-  call system_clock(c3)
-  print '("                               system_clock time = ",f12.3," seconds.")',(c3-c1)/rate
-  print*,' '
 
   
 contains
@@ -600,7 +571,6 @@ contains
     end if
     return
   end subroutine binary_search
-  
   
   subroutine read_PhotonsFromStars_params(pfile)
 
@@ -676,26 +646,12 @@ contains
              read(value,*) spec_table_lmin_Ang
           case ('spec_table_lmax_Ang')
              read(value,*) spec_table_lmax_Ang
-          case ('spec_flat_lmin_Ang')
-             read(value,*) spec_flat_lmin_Ang
-          case ('spec_flat_lmax_Ang')
-             read(value,*) spec_flat_lmax_Ang
-          case ('nphot')
-             read(value,*) nphot
+          case ('nPhotonPackets')
+             read(value,*) nphotons
           case ('ranseed')
              read(value,*) ranseed
           case ('verbose')
              read(value,*) verbose
-          case ('recompute_particle_initial_mass')
-             read(value,*) recompute_particle_initial_mass
-          case ('tdelay_SN')
-             read(value,*) tdelay_SN
-          case ('recyc_frac')
-             read(value,*) recyc_frac
-          ! Val
-          case ('weight_input_file')
-             write(weight_input_file,'(a)') trim(value)
-          ! laV
           case default
              write(*,'(a,a,a)') '> WARNING: parameter ',trim(name),' unknown '
           end select
@@ -749,25 +705,16 @@ contains
           write(unit,'(a,ES10.3,a)')     '  spec_gauss_lambda0    = ',spec_gauss_lambda0,   ' ! [A]'
           write(unit,'(a,ES10.3,a)')     '  spec_gauss_sigma_kms  = ',spec_gauss_sigma_kms, ' ! [km/s]'
        case('PowLaw')
-          write(unit,'(a,a)')            '  weight_input_file       = ',trim(weight_input_file)
           write(unit,'(a,es10.3,a)')     '  spec_powlaw_lmin_Ang    = ',spec_powlaw_lmin_Ang, ' ! [A]' 
           write(unit,'(a,es10.3,a)')     '  spec_powlaw_lmax_Ang    = ',spec_powlaw_lmax_Ang, ' ! [A]'
        case('Table')
           write(unit,'(a,es10.3,a)')     '  spec_table_lmin_Ang    = ',spec_table_lmin_Ang, ' ! [A]' 
           write(unit,'(a,es10.3,a)')     '  spec_table_lmax_Ang    = ',spec_table_lmax_Ang, ' ! [A]'
-       case('Flat')
-          write(unit,'(a,es10.3,a)')     '  spec_flat_lmin_Ang     = ',spec_flat_lmin_Ang, ' ! [A]' 
-          write(unit,'(a,es10.3,a)')     '  spec_flat_lmax_Ang     = ',spec_flat_lmax_Ang, ' ! [A]'
        end select
        write(unit,'(a)')             '# miscelaneous parameters'
-       write(unit,'(a,i8)')          '  nphot           = ',nphot
+       write(unit,'(a,i8)')          '  nPhotonPackets  = ',nphotons
        write(unit,'(a,i8)')          '  ranseed         = ',ranseed
        write(unit,'(a,L1)')          '  verbose         = ',verbose
-       write(unit,'(a,L1)')          '  recompute_particle_initial_mass = ',recompute_particle_initial_mass
-       if(recompute_particle_initial_mass)then
-          write(unit,'(a,L1)')          '  tdelay_SN       = ',tdelay_SN
-          write(unit,'(a,L1)')          '  recyc_frac      = ',recyc_frac
-       endif
        write(unit,'(a)')             ' '
        call print_ramses_params(unit)
     else
@@ -802,25 +749,16 @@ contains
           write(*,'(a,ES10.3,a)')     '  spec_gauss_lambda0      = ',spec_gauss_lambda0, ' ! [A]'
           write(*,'(a,es10.3,a)')     '  spec_gauss_sigma_kms    = ',spec_gauss_sigma_kms, ' ! [km/s]'
        case('PowLaw')
-          write(*,'(a,a)')            '  weight_input_file       = ',trim(weight_input_file)
           write(*,'(a,es10.3,a)')     '  spec_powlaw_lmin_Ang    = ',spec_powlaw_lmin_Ang, ' ! [A]' 
           write(*,'(a,es10.3,a)')     '  spec_powlaw_lmax_Ang    = ',spec_powlaw_lmax_Ang, ' ! [A]'
        case('Table')
           write(*,'(a,es10.3,a)')     '  spec_table_lmin_Ang     = ',spec_table_lmin_Ang, ' ! [A]' 
           write(*,'(a,es10.3,a)')     '  spec_table_lmax_Ang     = ',spec_table_lmax_Ang, ' ! [A]'
-       case('Flat')
-          write(*,'(a,es10.3,a)')     '  spec_flat_lmin_Ang     = ',spec_flat_lmin_Ang, ' ! [A]' 
-          write(*,'(a,es10.3,a)')     '  spec_flat_lmax_Ang     = ',spec_flat_lmax_Ang, ' ! [A]'
        end select
        write(*,'(a)')             '# miscelaneous parameters'
-       write(*,'(a,i8)')          '  nphot           = ',nphot
+       write(*,'(a,i8)')          '  nPhotonPackets  = ',nphotons
        write(*,'(a,i8)')          '  ranseed         = ',ranseed
        write(*,'(a,L1)')          '  verbose         = ',verbose
-       write(*,'(a,L1)')          '  recompute_particle_initial_mass = ',recompute_particle_initial_mass
-       if(recompute_particle_initial_mass)then
-          write(*,'(a,L1)')          '  tdelay_SN       = ',tdelay_SN
-          write(*,'(a,L1)')          '  recyc_frac      = ',recyc_frac
-       endif
        write(*,'(a)')             ' '
        call print_ramses_params
        write(*,'(a)')             ' '

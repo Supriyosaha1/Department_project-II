@@ -86,6 +86,11 @@ module module_ramses
   integer(kind=4) :: iheiii = 9 ! index of HeIII fraction 
   ! Ratio between deuterium and hydrogen
   real(kind=8)              :: deut2H_nb_ratio = 3.0d-5
+
+  ! --- parameters for star particles/feedback in simulation
+  logical                   :: recompute_particle_initial_mass = .false.
+  real(kind=8)              :: tdelay_SN = 10.        ! [Myr] SNs go off at tdelay_SN ... 
+  real(kind=8)              :: recyc_frac = 0.8       ! correct for recycling ... we want the mass of stars formed ...  
   ! --------------------------------------------------------------------------
   
   public :: ramses_get_leaf_cells
@@ -2747,7 +2752,7 @@ contains
   ! STARS utilities 
 
 
-  subroutine ramses_read_stars_in_domain(repository,snapnum,selection_domain,star_pos,star_age,star_minit,star_mass,star_vel,star_met, ncpu_read, cpu_list)
+  subroutine ramses_read_stars_in_domain(repository,snapnum,selection_domain,star_pos,star_age,star_minit,star_vel,star_met, ncpu_read, cpu_list)
 
     !$ use OMP_LIB
 
@@ -2757,21 +2762,20 @@ contains
     integer(kind=4),intent(in)             :: snapnum, ncpu_read
     integer(kind=4),allocatable,intent(in) :: cpu_list(:)  
     type(domain),intent(in)                :: selection_domain
-    real(kind=8),allocatable,intent(inout) :: star_pos(:,:),star_age(:),star_minit(:),star_mass(:),star_vel(:,:),star_met(:)
-    real(kind=8),allocatable               :: star_pos_all(:,:),star_age_all(:),star_minit_all(:),star_mass_all(:),star_vel_all(:,:),star_met_all(:)
+    real(kind=8),allocatable,intent(inout) :: star_pos(:,:),star_age(:),star_minit(:),star_vel(:,:),star_met(:)
+    real(kind=8),allocatable               :: star_pos_all(:,:),star_age_all(:),star_minit_all(:),star_vel_all(:,:),star_met_all(:)
     integer(kind=4)                        :: nstars
     real(kind=8)                           :: omega_0,lambda_0,little_h,omega_k,H0
     real(kind=8)                           :: aexp,stime,time_cu,boxsize
     integer(kind=4)                        :: ilast,icpu,npart,i,ifield,nfields
     character(1000)                        :: filename
-    integer(kind=4),allocatable            :: id(:)
-    real(kind=8),allocatable               :: age(:),m(:),x(:,:),v(:,:),mets(:),imass(:)
-    integer(kind=1),allocatable            :: family(:)
+    real(kind=8),allocatable               :: age(:),x(:,:),v(:,:),mets(:),imass(:)
     real(kind=8)                           :: temp(3)
     integer(kind=4)                        :: rank, iunit, ilast_all, k
     !JB- is impatient ... 
     logical::read_domain
     !-JB
+    logical :: imass_was_found = .false.
     
     ! get cosmological parameters to convert conformal time into ages
     call read_cosmo_params(repository,snapnum,omega_0,lambda_0,little_h)
@@ -2808,7 +2812,7 @@ contains
        write(*,*) 'ERROR : no star particles in domain '
        stop
     end if
-    allocate(star_pos_all(3,nstars),star_age_all(nstars),star_minit_all(nstars),star_mass_all(nstars),star_vel_all(3,nstars),star_met_all(nstars))
+    allocate(star_pos_all(3,nstars),star_age_all(nstars),star_minit_all(nstars),star_vel_all(3,nstars),star_met_all(nstars))
     ! get list of particle fields in outputs
     if (particle_families) then
        call get_fields_from_descriptor(repository,snapnum,nfields)
@@ -2824,7 +2828,7 @@ contains
 !$OMP SHARED(h0, stime, dp_scale_t, dp_scale_m, dp_scale_v, boxsize, time_cu, aexp) &
 !!!!  !!!$OMP SHARED(cosmo, use_initial_mass, use_proper_time) &
 !$OMP SHARED(cosmo, use_proper_time) &
-!$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_minit_all, star_mass_all, star_met_all)
+!$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_minit_all, star_met_all)
 !$OMP DO
     cpuloop: do k=1,ncpu_read
        icpu=cpu_list(k)
@@ -2843,11 +2847,10 @@ contains
        read(iunit)
 
        allocate(age(1:npart))
-       allocate(x(1:npart,1:ndim),m(npart),imass(npart))
-       allocate(id(1:npart))
+       allocate(x(1:npart,1:ndim))
+       allocate(imass(npart))
        allocate(mets(1:npart))
        allocate(v(1:npart,1:ndim))
-       if(particle_families) allocate(family(1:npart))
        do ifield = 1,nfields
           select case(trim(ParticleFields(ifield)))
           case('pos')
@@ -2863,7 +2866,7 @@ contains
                 end if
              end do
              if (.not. read_domain) then
-                deallocate(age,m,x,id,mets,v,imass)
+                deallocate(age,x,mets,v,imass)
                 close(iunit)
                 !print*,'skipping cpu ',icpu,irank
                 cycle cpuloop
@@ -2887,21 +2890,26 @@ contains
           case('velocity_z')
              read(iunit) v(1:npart,3)
           case('mass')
-             read(iunit) m(1:npart)
+             if (recompute_particle_initial_mass) then 
+                read(iunit) imass(1:npart)
+             else
+                read(iunit) ! skip to use initila_mass
+             end if
           case('iord','identity') 
-             read(iunit) id(1:npart)
+             read(iunit) ! skip 
           case('level','levelp')
-             read(iunit)
+             read(iunit) ! skip 
           case('tform','birth_time')
              read(iunit) age(1:npart)
           case('metal','metallicity')
              read(iunit) mets(1:npart)
           case('imass')
+             imass_was_found = .true.
              read(iunit) imass(1:npart)
           case('family')
-             read(iunit) family(1:npart)
+             read(iunit) ! skip 
           case('tag','ptracegroup')
-             read(iunit)  ! Skip
+             read(iunit) ! skip
           case default
              read(iunit)
              print*,'Error, Field unknown: ',trim(ParticleFields(ifield))
@@ -2913,7 +2921,16 @@ contains
           x=x/boxsize
        endif
 
-       allocate(star_pos(3,npart),star_age(npart),star_minit(npart),star_mass(npart),star_vel(3,npart),star_met(npart))
+       if (imass_was_found .and. recompute_particle_initial_mass) then
+          print*,'ERROR: initial mass of star particles is found yet recomputed ... Set recompute_particle_initial_mass to False... '
+          stop
+       end if
+       if (.not. imass_was_found .and. .not. recompute_particle_initial_mass) then 
+          print*,'ERROR: initial mass of star particles was not found. Use recompute_particle_initial_mass = True'
+          stop
+       end if
+       
+       allocate(star_pos(3,npart),star_age(npart),star_minit(npart),star_vel(3,npart),star_met(npart))
        ! save star particles within selection region
        ilast = 0
        do i = 1,npart
@@ -2932,7 +2949,6 @@ contains
                    ! convert from tborn to age in Myr
                    star_age(ilast)   = max(0.d0, (time_cu - age(i)) * dp_scale_t / (365.d0*24.d0*3600.d0*1.d6))
                 endif
-                star_mass(ilast)  = m(i)     * dp_scale_m
                 star_minit(ilast) = imass(i) * dp_scale_m ! [g]   
                 star_pos(:,ilast) = x(i,:)                ! [code units]
                 star_vel(:,ilast) = v(i,:)   * dp_scale_v ! [cm/s]
@@ -2941,23 +2957,20 @@ contains
           end if
        end do
 
-       deallocate(age,m,x,id,mets,v,imass)
-       if(particle_families) deallocate(family)
+       deallocate(age,x,mets,v,imass)
 
 !$OMP CRITICAL
        if(ilast .gt. 0) then
           star_age_all(ilast_all:ilast_all+ilast-1) = star_age(1:ilast)
           star_minit_all(ilast_all:ilast_all+ilast-1) = star_minit(1:ilast)
-          star_mass_all(ilast_all:ilast_all+ilast-1) = star_mass(1:ilast)
           star_pos_all(1:3,ilast_all:ilast_all+ilast-1) = star_pos(1:3,1:ilast)
           star_vel_all(1:3,ilast_all:ilast_all+ilast-1) = star_vel(1:3,1:ilast)
           star_met_all(ilast_all:ilast_all+ilast-1) = star_met(1:ilast)
        endif
        ilast_all = ilast_all + ilast
-       !$OMP END CRITICAL
+!$OMP END CRITICAL
 
-
-    deallocate(star_age,star_pos,star_vel,star_met,star_mass,star_minit)
+    deallocate(star_age,star_pos,star_vel,star_met,star_minit)
 
  enddo cpuloop
 !$OMP END DO
@@ -2974,11 +2987,20 @@ contains
     deallocate(star_age_all)
 
     ! masses
-    allocate(star_minit(nstars),star_mass(nstars))
+    allocate(star_minit(nstars))
     star_minit(:) = star_minit_all(1:nstars)
-    star_mass(:) = star_mass_all(1:nstars)
-    deallocate(star_minit_all,star_mass_all)
+    deallocate(star_minit_all)
 
+    
+    if(recompute_particle_initial_mass)then
+       do i = 1,nstars
+          if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
+             star_minit(i) = star_minit(i)/recyc_frac   ! correct for recycling ... we want the mass of stars formed ...
+          end if
+       end do
+    end if
+
+    
     ! positions
     allocate(star_pos(3,nstars))
     do i = 1,3
@@ -3367,6 +3389,12 @@ contains
              read(value,*) iheiii
           case('deut2H_nb_ratio')
              read(value,*) deut2H_nb_ratio
+          case ('recompute_particle_initial_mass')
+             read(value,*) recompute_particle_initial_mass
+          case ('tdelay_SN')
+             read(value,*) tdelay_SN
+          case ('recyc_frac')
+             read(value,*) recyc_frac
           end select
        end do
     end if
@@ -3404,6 +3432,11 @@ contains
        write(unit,'(a,i2)') '  iheii             = ', iheii
        write(unit,'(a,i2)') '  iheiii            = ', iheiii
        write(unit,'(a,ES10.3)')'  deut2H_nb_ratio   = ', deut2H_nb_ratio
+       write(unit,'(a,L1)')    '  recompute_particle_initial_mass = ',recompute_particle_initial_mass
+       if(recompute_particle_initial_mass)then
+          write(unit,'(a,L1)')          '  tdelay_SN       = ',tdelay_SN
+          write(unit,'(a,L1)')          '  recyc_frac      = ',recyc_frac
+       endif
     else
        write(*,'(a,a,a)') '[ramses]'
        write(*,'(a,L1)') '  self_shielding    = ',self_shielding
@@ -3420,6 +3453,11 @@ contains
        write(*,'(a,i2)') '  iheii             = ', iheii
        write(*,'(a,i2)') '  iheiii            = ', iheiii
        write(*,'(a,ES10.3)')'  deut2H_nb_ratio   = ', deut2H_nb_ratio
+       write(*,'(a,L1)')    '  recompute_particle_initial_mass = ',recompute_particle_initial_mass
+       if(recompute_particle_initial_mass)then
+          write(*,'(a,L1)')          '  tdelay_SN       = ',tdelay_SN
+          write(*,'(a,L1)')          '  recyc_frac      = ',recyc_frac
+       endif
     end if
 
     return
