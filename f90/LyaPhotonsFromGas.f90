@@ -5,7 +5,6 @@ program LyaPhotonsFromGas
   use module_random
   use module_constants
   use module_utils
-  use module_HI_1216_model, only: lambda_0, lambda_0_cm, nu_0
   
   implicit none
 
@@ -92,7 +91,7 @@ program LyaPhotonsFromGas
   ! define max extent of emission domain 
   call domain_get_bounding_box(emission_domain,xmin,xmax,ymin,ymax,zmin,zmax)
   call get_cpu_list_periodic(repository, snapnum, xmin,xmax,ymin,ymax,zmin,zmax, ncpu_read, cpu_list)
-  call ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level)
+  call ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level, 0)
   if (verbose) print*,'done reading'
   call select_cells_in_domain(emission_domain,nleaftot,x_leaf,leaf_level,emitting_cells)
   nsel = size(emitting_cells)
@@ -127,10 +126,10 @@ program LyaPhotonsFromGas
      if (coll_em(i) > maxcol) maxcol = coll_em(i) 
   end do
   
-  recomb_total = sum(recomb_em) / (planck*nu_0)  ! nb of photons per second
-  coll_total   = sum(coll_em) / (planck*nu_0)  ! nb of photons per second
+  recomb_total = sum(recomb_em) / (planck*nu_LyA)  ! nb of photons per second
+  coll_total   = sum(coll_em) / (planck*nu_LyA)  ! nb of photons per second
   
-  print*,'coll_total,recomb_total [erg/s] = ',coll_total*(planck*nu_0),recomb_total*(planck*nu_0)
+  print*,'coll_total,recomb_total [erg/s] = ',coll_total*(planck*nu_LyA),recomb_total*(planck*nu_LyA)
   
   recomb_em = recomb_em / maxrec
   coll_em   = coll_em / maxcol
@@ -207,7 +206,7 @@ program LyaPhotonsFromGas
               r1 = ran3(iseed)
               r2 = ran3(iseed)
               nu = sqrt(-2.*log(r1)) * cos(2.0d0*pi*r2)
-              nu_cell(iphot) = (HIDopWidth(ilow) * nu_0 / clight) * nu + nu_0
+              nu_cell(iphot) = (HIDopWidth(ilow) * nu_LyA / clight) * nu + nu_LyA
               ! compute frequency in exteral frame 
               scalar = k(1)*v_leaf(1,j) + k(2)*v_leaf(2,j) + k(3)*v_leaf(3,j)
               nu_em(iphot)  = nu_cell(iphot) / (1d0 - scalar/clight)
@@ -287,7 +286,7 @@ program LyaPhotonsFromGas
               r1 = ran3(iseed)
               r2 = ran3(iseed)
               nu = sqrt(-2.*log(r1)) * cos(2.0d0*pi*r2)
-              nu_cell(iphot) = (HIDopWidth(ilow) * nu_0 / clight) * nu + nu_0
+              nu_cell(iphot) = (HIDopWidth(ilow) * nu_LyA / clight) * nu + nu_LyA
               ! compute frequency in exteral frame 
               scalar = k(1)*v_leaf(1,j) + k(2)*v_leaf(2,j) + k(3)*v_leaf(3,j)
               nu_em(iphot)  = nu_cell(iphot) / (1d0 - scalar/clight)
@@ -498,4 +497,3 @@ contains
 
   
 end program LyaPhotonsFromGas
-

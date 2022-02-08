@@ -1,0 +1,9 @@
+! AlI - 1670.79 line
+! Parameters taken from https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+
+m_ion          = 26.98d0
+name_ion       = AlII
+lambda_cm      = 1.67079d-5                   
+A              = 1.41d9                              
+f              = 1.77d0               
+n_fluo         = 0

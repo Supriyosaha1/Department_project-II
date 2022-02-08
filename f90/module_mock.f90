@@ -1,4 +1,3 @@
-!--PEEL--
 module module_mock
 
   use module_constants, only:clight
@@ -34,17 +33,21 @@ module module_mock
      real(kind=8),allocatable :: cube(:,:,:)
      ! useful variables
      real(kind=8)    :: flux_aperture2, spec_aperture2 
-     logical         :: compute_spectrum,compute_image,compute_cube
+     logical         :: compute_flux,compute_spectrum,compute_image,compute_cube
   end type mockObs
   type(mockObs),allocatable :: mock(:)
 
-  ! parameters in the [mock] section :
+  ! --------------------------------------------------------------------------
+  ! user-defined parameters - read from section [mock] of the parameter file
+  ! --------------------------------------------------------------------------
   integer(kind=4) :: nDirections = 0
   character(2000) :: mock_parameter_file
   character(2000) :: mock_outputfilename  ! Prefix for output files (including absolute path) -> will be followed by "_image.xxxxx" or "_spectrum.xxxxx", with xxxxx the cpu number.
   !--FILTER--
   logical         :: use_filter = .false. ! use a filter response curve when computing images. 
   !--RETLIF--
+  logical         :: verbose = .false.
+  ! --------------------------------------------------------------------------
 
   ! global parameter setting peeling-off on or off.
   logical         :: peeling_off
@@ -72,10 +75,14 @@ contains
        open(unit=unit,file=mock_parameter_file,status='old',action='read',form='formatted')
        do idir = 1,nDirections
           call read_a_mock_param_set(unit,idir)
-          
+
           ! initialise flux
-          mock(idir)%flux = 0.0d0
-          mock(idir)%flux_aperture2 = mock(idir)%flux_aperture*mock(idir)%flux_aperture
+          mock(idir)%compute_flux = .false.
+          if (mock(idir)%flux_aperture > 0d0) then
+             mock(idir)%flux = 0.0d0
+             mock(idir)%compute_flux = .true.
+             mock(idir)%flux_aperture2 = mock(idir)%flux_aperture*mock(idir)%flux_aperture
+          end if
 
           ! initialise spectrum 
           mock(idir)%compute_spectrum = .false.
@@ -278,9 +285,9 @@ contains
   end subroutine peel_to_cube
 
   
-  subroutine dump_mocks(rank)
+  subroutine dump_mocks(fileout)
     implicit none
-    integer(kind=4),intent(in) :: rank
+    character(2000),intent(in) :: fileout
     character(2000)            :: filename
     integer(kind=4)            :: i,j,k, iunit=133,sunit=134,funit=135,cunit=136,idir
     logical :: iopen=.false.,sopen=.false.,fopen=.false.,copen=.false.
@@ -288,16 +295,18 @@ contains
     
     do idir = 1,nDirections
        ! save flux
-       if (.not. fopen) then 
-          write(filename,'(a,a,i5.5)') trim(mock_outputfilename),'_flux.',rank
-          open(unit=funit,file=filename,form='unformatted',status='unknown')
-          fopen = .true.
+       if(mock(idir)%compute_flux) then
+          if (.not. fopen) then
+             write(filename,'(a,a)') trim(fileout),'_flux'
+             open(unit=funit,file=filename,form='unformatted',status='unknown')
+             fopen = .true.
+          end if
+          write(funit) mock(idir)%flux_aperture, mock(idir)%flux
        end if
-       write(funit) mock(idir)%flux_aperture, mock(idir)%flux
        ! save spectrum
        if (mock(idir)%compute_spectrum) then 
           if (.not. sopen) then 
-             write(filename,'(a,a,i5.5)') trim(mock_outputfilename),'_spectrum.',rank
+             write(filename,'(a,a)') trim(fileout),'_spectrum'
              open(unit=sunit,file=filename,form='unformatted',status='unknown')
              sopen = .true.
           end if
@@ -308,7 +317,7 @@ contains
        ! save image
        if (mock(idir)%compute_image) then 
           if (.not. iopen) then 
-             write(filename,'(a,a,i5.5)') trim(mock_outputfilename),'_image.',rank
+             write(filename,'(a,a)') trim(fileout),'_image'
              open(unit=iunit,file=filename,form='unformatted',status='unknown')
              iopen = .true.
           end if
@@ -320,7 +329,7 @@ contains
        ! save cube
        if (mock(idir)%compute_cube) then 
           if (.not. copen) then 
-             write(filename,'(a,a,i5.5)') trim(mock_outputfilename),'_cube.',rank
+             write(filename,'(a,a)') trim(fileout),'_cube'
              open(unit=cunit,file=filename,form='unformatted',status='unknown')
              copen = .true.
           end if

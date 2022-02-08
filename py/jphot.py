@@ -16,7 +16,21 @@ class photonlist(object):
             else:
                 self.load_res()
 
-            
+    def get_nRealPhotons(self):
+        # usefull to get luminosity from ICs without reading the full thing. 
+        f = ff(self.icFile) 
+        [nphoton]  = f.read_ints()
+        [nRealPhotons] = f.read_reals('d')
+        f.close()
+        return nRealPhotons
+
+    def get_nphoton(self):
+        # usefull to get luminosity from ICs without reading the full thing. 
+        f = ff(self.icFile) 
+        [nphoton]  = f.read_ints()
+        f.close()
+        return nphoton
+
     def load_ic(self):
         # read photn IC file
         f = ff(self.icFile) 
@@ -44,7 +58,6 @@ class photonlist(object):
         self.vz_ic = xx[:,2]
         f.close()
 
-                
     def load_res(self): 
         # read results from RASCAS
         if self.bakFile is not None:

@@ -1,10 +1,13 @@
 module module_parallel_mpi
 
   use mpi
+  ! GATHER -- 
   use module_photon
+  ! -- GATHER
   !--PEEL-- 
   use module_mock
   !--LEEP--
+
 
   implicit none
 
@@ -23,9 +26,6 @@ module module_parallel_mpi
   integer(kind=MPI_ADDRESS_KIND)                  :: lb,extent,nextelement,lbound,asize
   integer(kind=4)                                 :: mpi_type_photon,temp
 
-  !--PEEL--
-  public :: master_receives_mock, send_mock_to_master
-  !--LEEP-- 
 
 contains
 
@@ -69,8 +69,7 @@ contains
     call MPI_ABORT(MPI_COMM_WORLD,error,code)
 
   end subroutine stop_mpi
-
-
+  
 
   subroutine define_mpi_type
     ! Create an MPI datatype for sending photons
@@ -150,8 +149,7 @@ contains
 
   end subroutine define_mpi_type
 
-
-
+  
   subroutine test_mpi_type
     ! With some hardware and/or MPI libs we had problem with MPI_TYPE_CREATE_STRUCT.
     ! This routine tests the correct behaviour of MPI with the type mpi_type_photon used in rascas.
@@ -181,7 +179,7 @@ contains
     ! Send p_test from 0 to 1
     if (rank == 0) then
        call MPI_SEND(p_test(1)%id, 10, MPI_TYPE_PHOTON, 1, tag , MPI_COMM_WORLD, code)
-    endif
+    end if
     if (rank == 1) then
        call MPI_RECV(temp_p(1)%id, 10, MPI_TYPE_PHOTON, 0, MPI_ANY_TAG, MPI_COMM_WORLD, status, IERROR)
        do i=1,10
@@ -206,6 +204,7 @@ contains
     endif
   end subroutine test_mpi_type
 
+
   !--PEEL--
   subroutine send_mock_to_master(idcpu)
     ! send mocks to master
@@ -216,11 +215,14 @@ contains
     n = idcpu
     print*,'cpu ',idcpu,' is sending info ... '
     call MPI_SEND(n, 1, MPI_INTEGER, 0, tag , MPI_COMM_WORLD, code)
-
+    
     do idir = 1,nDirections
        ! flux
-       call MPI_SEND(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
-       call MPI_SEND(mock(idir)%flux, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
+       call MPI_SEND(mock(idir)%compute_flux, 1, MPI_LOGICAL, 0, tag , MPI_COMM_WORLD, code)
+       if (mock(idir)%compute_flux) then
+          call MPI_SEND(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
+          call MPI_SEND(mock(idir)%flux, 1, MPI_DOUBLE_PRECISION, 0, tag , MPI_COMM_WORLD, code)
+       end if
        ! spectrum
        call MPI_SEND(mock(idir)%compute_spectrum, 1, MPI_LOGICAL, 0, tag , MPI_COMM_WORLD, code)
        if (mock(idir)%compute_spectrum) then 
@@ -278,9 +280,12 @@ contains
     
     do idir = 1,nDirections
        ! flux
-       call MPI_RECV(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
-       call MPI_RECV(flux, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
-       mock(idir)%flux = mock(idir)%flux + flux
+       call MPI_RECV(mock(idir)%compute_flux, 1, MPI_LOGICAL, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
+       if (mock(idir)%compute_flux) then
+          call MPI_RECV(mock(idir)%flux_aperture, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
+          call MPI_RECV(flux, 1, MPI_DOUBLE_PRECISION, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
+          mock(idir)%flux = mock(idir)%flux + flux
+       end if
        ! spectrum
        call MPI_RECV(mock(idir)%compute_spectrum, 1, MPI_LOGICAL, idcpu, DONE_TAG , MPI_COMM_WORLD, status,IERROR)
        if (mock(idir)%compute_spectrum) then
@@ -326,6 +331,8 @@ contains
     
   end subroutine master_receives_mock
   !--LEEP--
+
+  
   
 end module module_parallel_mpi
 
