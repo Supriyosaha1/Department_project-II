@@ -18,7 +18,7 @@ module module_gas_composition
      real(kind=8)                :: v(3)                   ! gas velocity [cm/s]
      real(kind=8),allocatable    :: number_density(:)      ! number density of each scatterer [cm^-3]
      real(kind=8)                :: vth_sq_times_m         ! 2 kb T / amu  , dopwidth = sqrt(vth_sq_times_m / m_ion + vturb**2)
-     real(kind=8)                :: vturb                  ! Turbulent velocity in every cell
+     real(kind=8)                :: vturb                  ! Turbulent velocity in every cell [cm/s]
      ! DUST -> model of Laursen, Sommer-Larsen and Andersen 2009.
      ! ->  ndust = (nHI + f_ion nHII)*Z/Zref
      ! f_ion and Zref are two free parameters . 
@@ -32,6 +32,9 @@ module module_gas_composition
   integer(kind=4)             :: element_number
   integer(kind=4),allocatable :: scatterer_ion_index(:)
   character(10),allocatable   :: name_ions_no_repetition(:)
+
+  integer(kind=4) :: HI_1216_flag = -1  ! will be set to the flag value for interaction through HI-Lya (i.e. the value of flag from get_scatter_flag) if HI-Lya is present. Stays -1 otherwise.
+  integer(kind=4) :: HI_1216_index = -1 ! the index of HI-1216 in the scatterer list. 
   
   
   ! --------------------------------------------------------------------------
@@ -44,7 +47,7 @@ module module_gas_composition
   character(2000)             :: krome_data_dir  = './'                  ! directory where the density of metallic ions are, from the Krome runs
   real(kind=8)                :: f_ion           = 0.01                  ! ndust = (n_HI + f_ion*n_HII) * Z/Zsun [Laursen+09]
   real(kind=8)                :: Zref            = 0.005                 ! reference metallicity. Should be ~ 0.005 for SMC and ~ 0.01 for LMC.
-  real(kind=8)                :: vturb           = 2d1                   ! Constant turbulent velocity accross the simulation,  in km/s
+  real(kind=8)                :: vturb_kms       = 2d1                   ! Constant turbulent velocity accross the simulation,  in km/s
   
   ! ! possibility to overwrite ramses values with an ad-hoc model 
   ! logical                  :: gas_overwrite       = .false. ! if true, define cell values from following parameters 
@@ -155,7 +158,7 @@ contains
     deallocate(T)
 
     ! Set turbulent velocity
-    g(:)%vturb          = vturb
+    g(:)%vturb          = vturb_kms * 1d5  ! [cm/s]
 
 
     return
@@ -242,19 +245,26 @@ contains
     
 
     if (tau_abs > tau_cell) then  ! photon is due for absorption outside the cell 
+
        gas_get_scatter_flag = 0   ! no scatter
        tau_abs = tau_abs - tau_cell
        if (tau_abs.lt.0.0d0) then
           print*, 'tau_abs est negatif'
           stop
        endif
-    else  ! the scattering happens inside the cell.
+    
+    else  ! the scattering happens inside the cell -> either on dust or on a line scatterer.
+
        tirage = ran3(iran)
        if(tirage < tau_dust/tau_cell) then
-          gas_get_scatter_flag = 1            ! Absorption by dust
+
+          ! Absorption by dust
+          gas_get_scatter_flag = 1            
+
        else
+
+          ! Absorption by a line scatterer
           tau = tau_dust
-          ! Loop to find the scatterer
           do i=1,nscatterer
              tau = tau + tau_ions(i)
              if(tirage < tau/tau_cell) then
@@ -262,29 +272,26 @@ contains
                 exit
              end if
           end do
+
+          if (gas_get_scatter_flag == HI_1216_flag) then ! if HI Lya scattering setup core-skipping acceleration 
+             CS_xcrit = 0.0d0
+             if (scatterer_list(HI_1216_index)%core_skip) then
+                delta_nu_doppler = sqrt(cell_gas%vth_sq_times_m + cell_gas%vturb**2) / scatterer_list(HI_1216_index)%lambda_cm 
+                a = scatterer_list(HI_1216_index)%A_over_fourpi/delta_nu_doppler
+                xcw = 6.9184721d0 + 81.766279d0 / (log10(a)-14.651253d0)  ! Smith+15, Eq. 21
+                x = (nu_cell - scatterer_list(HI_1216_index)%nu)/delta_nu_doppler
+                if (abs(x) < xcw) then ! apply core-skipping
+                   CS_tau_cell = tau_ions(HI_1216_index) * (CS_dist_cm / distance_to_border_cm)
+                   if (CS_tau_cell > 1.0d0) CS_xcrit = (CS_tau_cell * a)**(1./3.)/5.  ! Smith+15, Eq. 35
+                end if
+             end if
+          end if
+          
        end if
 
        distance_to_border_cm = distance_to_border_cm * (tau_abs / tau_cell)
+       
     end if
-
-
-    if(gas_get_scatter_flag>1) then
-       CS_xcrit = 0.0d0
-       if (scatterer_list(gas_get_scatter_flag-1)%core_skip .eqv. .true. .and. scatterer_list(gas_get_scatter_flag-1)%name_ion == 'HI') then
-          delta_nu_doppler = sqrt(cell_gas%vth_sq_times_m + vturb**2*1d10) / scatterer_list(gas_get_scatter_flag-1)%lambda_cm 
-          a = scatterer_list(gas_get_scatter_flag-1)%A_over_fourpi/delta_nu_doppler
-          xcw = 6.9184721d0 + 81.766279d0 / (log10(a)-14.651253d0)  ! Smith+15, Eq. 21
-          x = (nu_cell - scatterer_list(gas_get_scatter_flag-1)%nu)/delta_nu_doppler
-          if (abs(x) < xcw) then ! apply core-skipping
-             CS_tau_cell = get_tau(cell_gas%number_density(scatterer_ion_index(gas_get_scatter_flag-1)), cell_gas%vth_sq_times_m, cell_gas%vturb, CS_dist_cm, nu_cell, scatterer_list(gas_get_scatter_flag-1))
-             ! We can use only tau_HI_1216
-             !CS_tau_cell = CS_tau_cell + get_tau_dust(cell_gas%ndust, CS_dist_cm, nu_cell)
-             CS_tau_cell = CS_tau_cell * a
-             if (CS_tau_cell > 1.0d0) CS_xcrit = CS_tau_cell**(1./3.)/5.  ! Smith+15, Eq. 35
-          end if
-       end if
-    end if
-
 
     return
   end function gas_get_scatter_flag
@@ -432,8 +439,10 @@ contains
     logical                      :: ion_repeat, HI_present
 
     if(nscatterer == 0) then
+       
        element_number = 0
        metal_number   = 0
+
     else
 
        HI_present = .false.
@@ -569,8 +578,8 @@ contains
              read(value,*) f_ion
           case ('Zref')
              read(value,*) Zref
-          case ('vturb')
-             read(value,*) vturb
+          case ('vturb_kms')
+             read(value,*) vturb_kms
           ! case ('gas_overwrite')
           !    read(value,*) gas_overwrite
           ! case ('fix_nscat')
@@ -588,7 +597,16 @@ contains
     end if
     close(10)
 
-    ! Reading scatterer propertise
+    ! define flag for HI-Lyman-alpha if present
+    HI_1216_flag = -1
+    do i = 1, nscatterer
+       if (trim(scatterer_names(i)) == 'HI-1216') then
+          HI_1216_index = i
+          HI_1216_flag  = i + 1  ! +1 is for dust -> scatterer flags go from 2 to nscatterer + 1.
+       end if
+    end do
+    
+    ! Reading scatterer properties
     do i=1,nscatterer
        call read_scatterer_params(trim(atomic_data_dir)//'/'//trim(scatterer_names(i))//'.dat', pfile, scatterer_list(i), i)
     end do
@@ -625,7 +643,7 @@ contains
        write(unit,'(a,a)')      '  krome_data_dir  = ',trim(krome_data_dir)
        write(unit,'(a,ES10.3)') '  f_ion           = ',f_ion
        write(unit,'(a,ES10.3)') '  Zref            = ',Zref
-       write(unit,'(a,ES10.3)') '  vturb           = ',vturb
+       write(unit,'(a,ES10.3)') '  vturb_kms       = ',vturb_kms
        ! write(unit,'(a)')        '# overwrite parameters'
        ! write(unit,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
        ! if(gas_overwrite)then
@@ -635,7 +653,7 @@ contains
        !    write(unit,'(a,ES10.3)') '  fix_vth_sq_times_m = ',fix_vth_sq_times_m
        !    write(unit,'(a,ES10.3)') '  fix_ndust       = ',fix_ndust
        !    write(unit,'(a,ES10.3)') '  fix_vel         = ',fix_vel
-       !    write(unit,'(a,ES10.3)') '  fix_vturb       = ',fix_vturb
+       !    write(unit,'(a,ES10.3)') '  fix_vturb_kms   = ',fix_vturb_kms
        !    write(unit,'(a,ES10.3)') '  fix_box_size_cm = ',fix_box_size_cm
        ! endif
        write(unit,'(a)')             ' '
@@ -652,7 +670,7 @@ contains
        write(*,'(a,a)')      '  krome_data_dir  = ',trim(krome_data_dir)
        write(*,'(a,ES10.3)') '  f_ion           = ',f_ion
        write(*,'(a,ES10.3)') '  Zref            = ',Zref
-       write(*,'(a,ES10.3)') '  vturb           = ',vturb
+       write(*,'(a,ES10.3)') '  vturb_kms       = ',vturb_kms
        ! write(*,'(a)')        '# overwrite parameters'
        ! write(*,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
        ! if(gas_overwrite)then

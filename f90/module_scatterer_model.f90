@@ -33,10 +33,11 @@ module module_scatterer_model
      real(kind=8),allocatable      :: nu_fluo(:)        ! Frequencies of the fluorescent channels
      real(kind=8)                  :: sigma_factor      ! Cross-section factor-> multiply by Voigt(x,a)/delta_nu_doppler to get sigma.
 
+     ! parameters to control approximations in RT. Default values should be used for other lines than HI-1216. 
      logical                       :: recoil       = .false.     ! if set to true, recoil effect is computed
      logical                       :: isotropic    = .true.      ! if set to true, scattering events will be isotropic
-     logical                       :: core_skip    = .false.     ! if true, skip scatterings in the core of the line (as in Smith+15).
-     real(kind=8)                  :: xcritmax     = -1d10       ! core-skipping will truncate at min(xcrit, xcritmax) -> set to a low (but positive) value to activate. 
+     logical                       :: core_skip    = .false.     ! if true, skip scatterings in the core of the line (as in Smith+15). !!! Use only for Hydrogen Lya !!! 
+     real(kind=8)                  :: xcritmax     = 3.0d0       ! core-skipping will truncate at min(xcrit, xcritmax). Used only if core_skip is true.  
 
   end type scatterer
   
@@ -55,7 +56,8 @@ contains
     ! --------------------------------------------------------------------------
     ! INPUTS:
     ! - nscat                 : number density of scatterers                    [ cm^-3 ]
-    ! - vth_sq_times_m        : 2 * kb * T / amu 
+    ! - vth_sq_times_m        : 2 * kb * T / amu
+    ! - vturb                 : some turbulent velocity                         [cm/s]
     ! - distance_to_border_cm : distance over which we compute tau              [ cm ]
     ! - nu_cell               : photon's frequency in the frame of the cell     [ Hz ]
     ! OUTPUT :
@@ -66,8 +68,7 @@ contains
     real(kind=8)               :: delta_nu_doppler,x_cell,sigma,a,h_cell,get_tau
 
     ! compute Doppler width and a-parameter
-
-    delta_nu_doppler = sqrt(vth_sq_times_m / s%m_ion + vturb**2*1d10) / s%lambda_cm
+    delta_nu_doppler = sqrt(vth_sq_times_m / s%m_ion + vturb**2) / s%lambda_cm
     a = s%A_over_fourpi / delta_nu_doppler
  
     ! Cross section of scatterer
@@ -90,12 +91,13 @@ contains
     ! INPUTS :
     ! - vcell    : bulk velocity of the gas (i.e. cell velocity)       [ cm / s ] 
     ! - vth_sq_times_m : thermal velocity square times atomic mass
-    ! - vturb    : turbulent velocity                                  [km/s]
+    ! - vturb    : turbulent velocity                                  [cm/s]
     ! - nu_cell  : frequency of incoming photon in cell's rest-frame   [ Hz ] 
     ! - k        : propagaction vector (normalized) 
     ! - nu_ext   : frequency of incoming photon, in external frame     [ Hz ]
     ! - iran     : random number generator seed
-    ! - s        : Variable de type scatterer, 
+    ! - xcrit    : used for core-skipping optimisation (HI-Lya only). 
+    ! - s        : scattrerer 
     ! OUTPUTS :
     ! - nu_cell  : updated frequency in cell's frame   [ Hz ]
     ! - nu_ext   : updated frequency in external frame [ Hz ]
@@ -126,19 +128,15 @@ contains
     real(kind=8),dimension(3)               :: knew
     integer(kind=4)                         :: i
 
-    ! !--CORESKIP--  sanity check ... 
-    ! if (.not. s%core_skip .and. xcrit .ne. 0.0d0) then
-    !    print*,'ERROR: core skipping is off but xcrit is not zero ... '
-    !    stop
-    ! end if
-    ! if (s%core_skip)  then
-    !    xc = min(xcrit,s%xcritmax)
-    ! else
-    !    xc=0.0d0
-    ! endif
-    ! !--PIKSEROC--
+    !--CORESKIP--  sanity check ... 
+    if (s%core_skip)  then
+       xc = min(xcrit,s%xcritmax)
+    else
+       xc=0.0d0
+    endif
+    !--PIKSEROC--
 
-    dopwidth = sqrt(vth_sq_times_m / s%m_ion + vturb**2*1d10)
+    dopwidth = sqrt(vth_sq_times_m / s%m_ion + vturb**2)
     
     ! define x_cell & a
     delta_nu_doppler = dopwidth / s%lambda_cm 
@@ -199,10 +197,12 @@ contains
        end if
     end if
 
+    
     ! 5/ recoil effect 
     if (s%recoil) then ! Works only for HI
        nu_atom = nu_atom / (1.0d0 + ((planck*nu_atom)/(mp*clight*clight))*(1.0d0-mu))
     end if
+
     
     ! 6/ compute atom freq. in external frame, after scattering
     scalar = knew(1) * vcell(1) + knew(2) * vcell(2) + knew(3)* vcell(3)
@@ -224,7 +224,7 @@ contains
     ! INPUTS :
     ! - vcell    : bulk velocity of the gas (i.e. cell velocity)       [ cm / s ] 
     ! - vth_sq_times_m : thermal velocity square times atomic mass
-    ! - vturb    : turbulent velocity                                  [km/s]
+    ! - vturb    : turbulent velocity                                  [cm/s]
     ! - nu_ext   : frequency of incoming photon, in external frame     [ Hz ]
     ! - kin      : propagation vector (normalized)
     ! - kout     : direction after interaction (fixed)
@@ -257,7 +257,7 @@ contains
     scalar  = kin(1) * vcell(1) + kin(2) * vcell(2) + kin(3) * vcell(3)
     nu_cell = (1.d0 - scalar/clight) * nu_ext
 
-    dopwidth = sqrt(vth_sq_times_m / s%m_ion + vturb**2*1d10)
+    dopwidth = sqrt(vth_sq_times_m / s%m_ion + vturb**2)
 
     ! define x_cell & a
     delta_nu_doppler = dopwidth / s%lambda_cm 
@@ -380,25 +380,27 @@ contains
           case ('A_fluo')
              read(value,*) s%A_fluo(:)
              s%A_tot = s%A + sum(s%A_fluo(:))
-
-             !    !--CORESKIP--
-             ! case ('core_skip') 
-             !    read(value,*) core_skip
-             ! case ('xcritmax')
-             !    read(value,*) xcritmax
-             !    !--PIKSEROC--
-
+          case('recoil')
+             read(value,*) s%recoil
+          case('isotropic')
+             read(value,*) s%isotropic
+          !--CORESKIP--
+          case ('core_skip') 
+             read(value,*) s%core_skip
+          case ('xcritmax')
+             read(value,*) s%xcritmax
+          !--PIKSEROC--
           end select
        end do
        close(10)
     end if
 
-    ! !--CORESKIP--  sanity check ... 
-    ! if (core_skip .and. xcritmax <= 0.0d0) then
-    !    print*,'ERROR: core skipping is on but xcritmax is not set... '
-    !    stop
-    ! end if
-    ! !--PIKSEROC-- 
+    !--CORESKIP--  sanity check ... 
+    if (s%core_skip .and. s%xcritmax <= 0.0d0) then
+       print*,'ERROR: core skipping is on but xcritmax is not set... '
+       stop
+    end if
+    !--PIKSEROC-- 
     
     if(index_call_read == 1) then
        call read_uparallel_params(pfile)

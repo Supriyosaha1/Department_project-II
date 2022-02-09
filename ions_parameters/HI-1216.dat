@@ -7,3 +7,8 @@ lambda_cm = 1215.67d-8
 A         = 6.265d8                               
 f         = 0.416d0                 
 n_fluo    = 0
+! parameters to control RT approximations
+isotropic = F
+recoil    = T
+core_skip = T
+xcritmax  = 100.
