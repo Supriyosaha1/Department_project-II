@@ -59,6 +59,7 @@ module module_ramses
 
   ! particle-related stuff -----------------------------------------------------------
   character(30) :: ParticleFields(20)  ! array of particle fields (e.g. (/'pos','vel','mass','iord','level'/) for a DM-only run)
+  integer(kind=1),parameter :: FAM_DM=1, FAM_STAR=2, FAM_CLOUD=3, FAM_DEBRIS=4, FAM_OTHER=5, FAM_UNDEF=127
   ! conformal time things
   integer(kind=4),parameter             :: n_frw = 1000
   real(KIND=8),dimension(:),allocatable :: aexp_frw,hexp_frw,tau_frw,t_frw
@@ -2770,6 +2771,8 @@ contains
     integer(kind=4)                        :: ilast,icpu,npart,i,ifield,nfields
     character(1000)                        :: filename
     real(kind=8),allocatable               :: age(:),x(:,:),v(:,:),mets(:),imass(:)
+    integer(kind=1),allocatable            :: family(:)
+    logical                                :: ok
     real(kind=8)                           :: temp(3)
     integer(kind=4)                        :: rank, iunit, ilast_all, k
     !JB- is impatient ... 
@@ -2826,7 +2829,6 @@ contains
 !$OMP DEFAULT(private) &
 !$OMP SHARED(ncpu_read, repository, snapnum, ParticleFields, nfields, selection_domain) &
 !$OMP SHARED(h0, stime, dp_scale_t, dp_scale_m, dp_scale_v, boxsize, time_cu, aexp) &
-!!!!  !!!$OMP SHARED(cosmo, use_initial_mass, use_proper_time) &
 !$OMP SHARED(cosmo, use_proper_time) &
 !$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_minit_all, star_met_all)
 !$OMP DO
@@ -2851,6 +2853,7 @@ contains
        allocate(imass(npart))
        allocate(mets(1:npart))
        allocate(v(1:npart,1:ndim))
+       if(particle_families) allocate(family(1:npart))
        do ifield = 1,nfields
           select case(trim(ParticleFields(ifield)))
           case('pos')
@@ -2907,7 +2910,7 @@ contains
              imass_was_found = .true.
              read(iunit) imass(1:npart)
           case('family')
-             read(iunit) ! skip 
+             read(iunit) family(1:npart) 
           case('tag','ptracegroup')
              read(iunit) ! skip
           case default
@@ -2934,7 +2937,13 @@ contains
        ! save star particles within selection region
        ilast = 0
        do i = 1,npart
-          if (age(i).ne.0.0d0) then ! This is a star
+          ok = .false.
+          if (particle_families) then
+             ok = family(i).eq.FAM_STAR
+          else
+             ok = age(i).ne.0.0d0  ! FIXME: does not work with AGN?
+          end if
+          if(ok) then ! This is a star
              temp(:) = x(i,:)
              if (domain_contains_point(temp,selection_domain)) then ! it is inside the domain
                 ilast = ilast + 1
@@ -2958,6 +2967,7 @@ contains
        end do
 
        deallocate(age,x,mets,v,imass)
+       if(particle_families) deallocate(family)
 
 !$OMP CRITICAL
        if(ilast .gt. 0) then
@@ -2994,7 +3004,7 @@ contains
     
     if(recompute_particle_initial_mass)then
        do i = 1,nstars
-          if (star_age(i) < tdelay_SN) then       ! SNs go off at tdelay_SN ... 
+          if (star_age(i) > tdelay_SN) then       ! SNs go off at tdelay_SN ... 
              star_minit(i) = star_minit(i)/recyc_frac   ! correct for recycling ... we want the mass of stars formed ...
           end if
        end do
@@ -3434,8 +3444,8 @@ contains
        write(unit,'(a,ES10.3)')'  deut2H_nb_ratio   = ', deut2H_nb_ratio
        write(unit,'(a,L1)')    '  recompute_particle_initial_mass = ',recompute_particle_initial_mass
        if(recompute_particle_initial_mass)then
-          write(unit,'(a,L1)')          '  tdelay_SN       = ',tdelay_SN
-          write(unit,'(a,L1)')          '  recyc_frac      = ',recyc_frac
+          write(unit,'(a,ES10.3)')          '  tdelay_SN       = ',tdelay_SN
+          write(unit,'(a,ES10.3)')          '  recyc_frac      = ',recyc_frac
        endif
     else
        write(*,'(a,a,a)') '[ramses]'
@@ -3455,8 +3465,8 @@ contains
        write(*,'(a,ES10.3)')'  deut2H_nb_ratio   = ', deut2H_nb_ratio
        write(*,'(a,L1)')    '  recompute_particle_initial_mass = ',recompute_particle_initial_mass
        if(recompute_particle_initial_mass)then
-          write(*,'(a,L1)')          '  tdelay_SN       = ',tdelay_SN
-          write(*,'(a,L1)')          '  recyc_frac      = ',recyc_frac
+          write(*,'(a,ES10.3)')          '  tdelay_SN       = ',tdelay_SN
+          write(*,'(a,ES10.3)')          '  recyc_frac      = ',recyc_frac
        endif
     end if
 

@@ -26,6 +26,9 @@ program PhotonsFromStars
   integer(kind=4)          :: ilow, iphot, iseed, ilow2
   real(kind=8)             :: lambda0, k(3), lambdamin, lambdamax, nu, spec_gauss_nu0, lambda_star, weight
 
+  real(kind=8)                :: start, finish, rate, intermed
+  integer(kind=8)             :: c1,c2,cr,c3
+
   !JB-
   integer(kind=4),allocatable:: ncomputeperstar(:)
   !-JB
@@ -77,6 +80,11 @@ program PhotonsFromStars
   integer(kind=4)                          :: ncpu_read
   integer(kind=4),dimension(:),allocatable :: cpu_list
 
+
+  call cpu_time(start)
+  call system_clock(count_rate=cr)
+  rate = float(cr)
+  call system_clock(c1)
 
   ! -------------------- read parameters --------------------
   narg = command_argument_count()
@@ -150,6 +158,11 @@ program PhotonsFromStars
   print*,'minmax met =',minval(star_met),maxval(star_met)
   ! --------------------------------------------------------------------------------------
 
+  call cpu_time(intermed)
+  call system_clock(c2)
+  print '(" --> Done with Reading stars. Elapsed time = ",f12.3," seconds.")',intermed-start
+  print '("                               system_clock time = ",f12.3," seconds.")',(c2-c1)/rate
+  print*,' '
   
   
   ! --------------------------------------------------------------------------------------
@@ -257,11 +270,11 @@ program PhotonsFromStars
 
      ! compute lbin
      allocate(lbin(NdotGrid%nlambda))
-     lbin(1) = NdotGrid%lambda(1)
-     do i = 2,NdotGrid%nlambda-1
+     do i = 1,NdotGrid%nlambda-1
         lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
      enddo
-     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda)
+     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda) + (NdotGrid%lambda(i) - NdotGrid%lambda(i-1))/2.0d0
+     
 
      do iphot = 1,nphotons
 
@@ -352,11 +365,10 @@ program PhotonsFromStars
 
      ! compute lbin
      allocate(lbin(NdotGrid%nlambda))
-     lbin(1) = NdotGrid%lambda(1)
-     do i = 2,NdotGrid%nlambda-1
+     do i = 1,NdotGrid%nlambda-1
         lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
      enddo
-     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda)
+     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda) + (NdotGrid%lambda(i) - NdotGrid%lambda(i-1))/2.0d0
 
      
      allocate(ncomputeperstar(nstars))
@@ -509,6 +521,12 @@ program PhotonsFromStars
   deallocate(nu_star, nu_em, x_em, k_em, v_em)
   ! --------------------------------------------------------------------------------------
 
+  call cpu_time(finish)
+  print '(" --> Done with PhotonStars. Total elapsed time = ",f12.3," seconds.")',finish-start
+  call system_clock(c3)
+  print '("                               system_clock time = ",f12.3," seconds.")',(c3-c1)/rate
+  print*,' '
+  
   
 contains
     
