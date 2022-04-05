@@ -285,9 +285,8 @@ contains
   end subroutine peel_to_cube
 
   
-  subroutine dump_mocks(fileout)
+  subroutine dump_mocks
     implicit none
-    character(2000),intent(in) :: fileout
     character(2000)            :: filename
     integer(kind=4)            :: i,j,k, iunit=133,sunit=134,funit=135,cunit=136,idir
     logical :: iopen=.false.,sopen=.false.,fopen=.false.,copen=.false.
@@ -297,7 +296,7 @@ contains
        ! save flux
        if(mock(idir)%compute_flux) then
           if (.not. fopen) then
-             write(filename,'(a,a)') trim(fileout),'_flux'
+             write(filename,'(a,a)') trim(mock_outputfilename),'.flux'
              open(unit=funit,file=filename,form='unformatted',status='unknown')
              fopen = .true.
           end if
@@ -306,7 +305,7 @@ contains
        ! save spectrum
        if (mock(idir)%compute_spectrum) then 
           if (.not. sopen) then 
-             write(filename,'(a,a)') trim(fileout),'_spectrum'
+             write(filename,'(a,a)') trim(mock_outputfilename),'.spectrum'
              open(unit=sunit,file=filename,form='unformatted',status='unknown')
              sopen = .true.
           end if
@@ -317,7 +316,7 @@ contains
        ! save image
        if (mock(idir)%compute_image) then 
           if (.not. iopen) then 
-             write(filename,'(a,a)') trim(fileout),'_image'
+             write(filename,'(a,a)') trim(mock_outputfilename),'.image'
              open(unit=iunit,file=filename,form='unformatted',status='unknown')
              iopen = .true.
           end if
@@ -329,7 +328,7 @@ contains
        ! save cube
        if (mock(idir)%compute_cube) then 
           if (.not. copen) then 
-             write(filename,'(a,a)') trim(fileout),'_cube'
+             write(filename,'(a,a)') trim(mock_outputfilename),'.cube'
              open(unit=cunit,file=filename,form='unformatted',status='unknown')
              copen = .true.
           end if

@@ -274,7 +274,7 @@ contains
        call MPI_BARRIER(MPI_COMM_WORLD,code)    
        
        print*,'[master] writing mock to file'
-       call dump_mocks(fileout)
+       call dump_mocks
     end if
     !--LEEP--
 

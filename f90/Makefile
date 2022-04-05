@@ -1,17 +1,26 @@
 #############################################################################
 # Fortran compiler options and directives
 
-SYSTYPE="PSMN"
+SYSTYPE="Cascade"
 #SYSTYPE="CCF"
 #SYSTYPE="lyocral"
 #SYSTYPE="lyocralP"
 #SYSTYPE="mac"
 #SYSTYPE="macP"
-SYSTYPE="ccage"
+#SYSTYPE="ccage"
 #SYSTYPE="horizon"
 
 OPTIONS = -cpp # -fopenmp
 OPTIONS += -DDISPLAY_PROGRESS_PERCENT
+
+
+ifeq ($(SYSTYPE),"Cascade")
+F90      = mpif90  -ffree-line-length-none -ffree-form -fallow-argument-mismatch
+#FFLAGS  =  -g -fcheck=all -ftrapv -fbounds-check -fbacktrace
+FFLAGS   = -O3
+FFLAGS  += $(OPTIONS)
+LDFLAGS  = -lmpi
+endif
 
 ifeq ($(SYSTYPE),"PSMN")
 F90         = mpif90
