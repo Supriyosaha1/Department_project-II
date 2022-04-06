@@ -1754,9 +1754,12 @@ contains
           lambda = 315614.d0/TK
           alpha_B = 2.753d-14*(lambda**(1.5))/(1+(lambda/2.74)**0.407)**(2.242) ![cm3/s]
           recomb_em(j) = prob_case_B * alpha_B * n_e * nhii * e_lya ! [erg/cm3/s]
-          ! collisional emission
-          collExrate_HI = 2.41d-6/sqrt(TK) * (TK/1.d4)**0.22 * exp(-1.63d-11/(kB*TK))
-          coll_em(j) = nHI * n_e * collExrate_HI * e_lya
+          ! collisional emission - From old stuff (Goerdt+10)
+          !collExrate_HI = 2.41d-6/sqrt(TK) * (TK/1.d4)**0.22 * exp(-1.63d-11/(kB*TK))
+          !coll_em(j) = nHI * n_e * collExrate_HI * e_lya
+          ! Collisional emission from Harley's new integration up to level 5
+          collExrate_HI = (6.58d-18 / TK**0.185) * exp(-4.86d4/TK**0.895)
+          coll_em(j) = nHI * n_e * collExrate_HI ! [erg/s/cm3]
        end do
     else
        print*,'Not implemented ... '
