@@ -2671,6 +2671,39 @@ contains
   end subroutine get_fields_from_descriptor
 
 
+  subroutine get_fields_from_descriptor(dir,ts,nfields)
+
+    implicit none
+
+    character(1000),intent(in)  :: dir
+    integer(kind=4),intent(in)  :: ts
+    integer(kind=4),intent(out) :: nfields
+    character(2000)             :: filename,line,iv,name
+    integer(kind=4) :: i,j,err,ivar
+
+    write(filename,'(a,a,i5.5,a,i5.5,a)') trim(dir),'/output_',ts,'/part_file_descriptor.txt'
+    open(unit=50,file=filename,status='old',action='read',form='formatted')
+    nfields = 0
+    do
+       read (50,'(a)',iostat=err) line
+       if(err/=0) exit
+       ! format should be ivar, var_name, descriptor
+       i = scan(line, ',')
+       j = scan(line, ',', .true.)  ! We need the second comma
+       if(i==0 .or. line(1:1)=='#') cycle  ! skip empty/commented lines
+       name = trim(adjustl(line(i+1:j-1)))
+       iv = trim(adjustl(line(:i-1)))
+       read(iv,*) ivar
+       ParticleFields(ivar) = name
+       nfields = nfields + 1
+    end do
+    close(50)
+
+    return
+
+  end subroutine get_fields_from_descriptor
+
+
   !*****************************************************************************************************************
 
   subroutine read_cooling(repository,snapnum)
@@ -2812,14 +2845,12 @@ contains
     else
        nstars = get_tot_nstars_cpu_list(repository,snapnum,ncpu_read,cpu_list)
     end if
-
-
     if (nstars == 0) then
        write(*,*) 'ERROR : no star particles in domain '
        stop
     end if
     allocate(star_pos_all(3,nstars),star_age_all(nstars),star_minit_all(nstars),star_vel_all(3,nstars),star_met_all(nstars))
-    ! get list of particle fields in outputs
+    ! get list of particle fields in outputs 
     if (particle_families) then
        call get_fields_from_descriptor(repository,snapnum,nfields)
     else
@@ -2832,7 +2863,7 @@ contains
 !$OMP DEFAULT(private) &
 !$OMP SHARED(ncpu_read, repository, snapnum, ParticleFields, nfields, selection_domain) &
 !$OMP SHARED(h0, stime, dp_scale_t, dp_scale_m, dp_scale_v, boxsize, time_cu, aexp) &
-!$OMP SHARED(cosmo, use_proper_time) &
+!$OMP SHARED(cosmo, use_proper_time, particle_families)) &
 !$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_minit_all, star_met_all)
 !$OMP DO
     cpuloop: do k=1,ncpu_read
@@ -3122,6 +3153,36 @@ contains
 
 
   
+
+  function get_tot_nstars_families(dir, ts)
+    
+    implicit none
+
+    integer(kind=4),intent(in) :: ts
+    character(1000),intent(in) :: dir
+    character(2000)            :: filename,line,v
+    integer(kind=4)            :: i,j,err
+    integer(kind=4)            :: get_tot_nstars_families
+
+    get_tot_nstars_families = 0
+    write(filename,'(a,a,i5.5,a,i5.5,a)') trim(dir),'/output_',ts,'/header_',ts,'.txt'
+    open(unit=50,file=filename,status='old',action='read',form='formatted')
+
+    do
+       read (50,'(a)',iostat=err) line
+       if(err/=0) exit
+       i = index(line, 'star')
+       j = index(line, 'star_tracer')
+       if (i/=0 .and. j==0) then
+          ! We have found the entry with stars and not the tracer one
+          v = trim(adjustl(line(i+len('star'):)))
+          read(v,*) get_tot_nstars_families
+       end if
+    end do
+    close(50)    
+
+  end function get_tot_nstars_families
+
 
   ! conformal time utils :
     function ct_conftime2time(tau)

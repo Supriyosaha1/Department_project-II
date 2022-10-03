@@ -577,6 +577,7 @@ contains
     type(gas)                     :: cell_gas       ! gas in the current cell 
     real(kind=8)                  :: nupeel, nu_src, nu_ext, scalar
 
+    peels_count = peels_count+nPeeled
     do idir = 1,nDirections
        kobs = mock_line_of_sight(idir)
        do ipeel = 1,nPeeled
@@ -589,6 +590,7 @@ contains
           tau = tau_max
           nupeel = PeelBuffer(ipeel)%nu ! save to restore for next directions
           if (increment_flux .or. increment_spec .or. increment_image .or. increment_cube) then
+             rays_count = rays_count+1
              if (PeelBuffer(ipeel)%scatter_flag > 0) then 
                 ileaf    = - domesh%son(PeelBuffer(ipeel)%icell)
                 cell_gas = domesh%gas(ileaf)
@@ -614,16 +616,12 @@ contains
           end if
           ! if tau is not absurdly large, increment detectors
           if (tau < tau_max) then
-             peel_contrib = PeelBuffer(ipeel)%weight * exp(-tau) * 2.0d0
-             if (increment_flux)  call peel_to_flux(peel_contrib,idir) 
+             detectors_count(idir) = detectors_count(idir) + 1
+             peel_contrib = PeelBuffer(ipeel)%weight * exp(-tau) * 2.0d0 
+             if (increment_flux)  call peel_to_flux(PeelBuffer(ipeel)%nu,peel_contrib,idir) 
              if (increment_spec)  call peel_to_spec(PeelBuffer(ipeel)%nu,peel_contrib,idir)
+             if (increment_image) call peel_to_map(projpos,PeelBuffer(ipeel)%nu,peel_contrib,idir)
              if (increment_cube)  call peel_to_cube(projpos,PeelBuffer(ipeel)%nu,peel_contrib,idir)
-             if (increment_image) then
-                !--FILTER--
-                if (use_filter) peel_contrib = peel_contrib * filter_response(PeelBuffer(ipeel)%nu)
-                !--RETLIF-- 
-                call peel_to_map(projpos,peel_contrib,idir)
-             end if
           end if
           PeelBuffer(ipeel)%nu = nupeel ! restore for next directions
        end do
