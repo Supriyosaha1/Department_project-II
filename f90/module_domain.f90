@@ -138,40 +138,6 @@ contains
   ! public use
   !--------------------------------------------------------------------------------------------------
 
-  subroutine select_in_domain(dom,n,xp,indsel)
-
-    implicit none
-    integer(kind=4),intent(in)                           :: n
-    type(domain),intent(in)                              :: dom 
-    real(kind=8),dimension(1:n,1:3),intent(in)           :: xp
-    integer(kind=4),dimension(:),allocatable,intent(out) :: indsel
-    integer(kind=4)                                      :: i,ii,nsel
-    integer(kind=4),dimension(:),allocatable             :: tmpi 
-    real(kind=8),dimension(1:3)                          :: xc
-   
-    allocate(indsel(1:n))
-    indsel=0
-    ii=0
-    do i=1,n
-       xc(1:3) = xp(i,1:3)
-       if(domain_contains_point(xc,dom))then
-          ii=ii+1
-          indsel(ii)=i
-       endif
-    enddo
-    nsel=ii
-    allocate(tmpi(1:nsel))
-    tmpi(1:nsel) = indsel(1:nsel)
-    deallocate(indsel)
-    allocate(indsel(1:nsel))
-    indsel=tmpi
-    deallocate(tmpi)
-    
-  end subroutine select_in_domain
-
-
-
-
   subroutine select_cells_in_domain(dom,n,xp,level,indsel)
     
     implicit none
@@ -330,7 +296,6 @@ contains
     character(*),intent(in) :: file
     type(domain),intent(in) :: dom 
 
-    !!!write(file ,'(a,a)') trim(fichier),'.dom'
     open(unit=14, file=trim(file), status='unknown', form='formatted', action='write')
     call dump_domain_form(unit=14,dom=dom)
     close(14)
@@ -356,21 +321,18 @@ contains
        else if (dx < -0.5d0) then 
           dx = dx + 1.0d0
        end if
-
        dy = x(2)-dom%sp%center(2)
        if (dy > 0.5d0) then 
           dy = dy -1.0d0 
        else if (dy < -0.5d0) then 
           dy = dy + 1.0d0
        end if
-
        dz = x(3)-dom%sp%center(3)
        if (dz > 0.5d0) then 
           dz = dz -1.0d0 
        else if (dz < -0.5d0) then 
           dz = dz + 1.0d0
        end if
-
        !rr = (x(1)-dom%sp%center(1))**2 + (x(2)-dom%sp%center(2))**2 + (x(3)-dom%sp%center(3))**2
        rr = dx**2 + dy**2 + dz**2
        if(rr<dom%sp%radius*dom%sp%radius)domain_contains_point=.true.
@@ -400,41 +362,33 @@ contains
        if((rr>dom%sh%r_inbound*dom%sh%r_inbound).and.(rr<dom%sh%r_outbound*dom%sh%r_outbound))domain_contains_point=.true.
 
     case('cube')
-
        ! correct positions for periodic boundaries 
-
        dx = x(1)-dom%cu%center(1)
        if (dx > 0.5d0) then 
           dx = dx -1.0d0 
        else if (dx < -0.5d0) then 
           dx = dx + 1.0d0
        end if
-
        if (abs(dx) < dom%cu%size*0.5d0) then 
-
           dx = x(2)-dom%cu%center(2)
           if (dx > 0.5d0) then 
              dx = dx -1.0d0 
           else if (dx < -0.5d0) then 
              dx = dx + 1.0d0
           end if
-
           if (abs(dx) < dom%cu%size*0.5d0) then 
-
              dx = x(3)-dom%cu%center(3)
              if (dx > 0.5d0) then 
                 dx = dx -1.0d0 
              else if (dx < -0.5d0) then 
                 dx = dx + 1.0d0
              end if
-
              if (abs(dx) < dom%cu%size*0.5d0) then
-
                 domain_contains_point=.true.
              end if
           end if
        end if
-
+       
     case('slab')
        dz = x(3) - dom%sl%zc
        if (dz > 0.5d0) then 
@@ -443,12 +397,11 @@ contains
           dz = dz + 1.0d0
        end if
        if(abs(dz) < dom%sl%thickness*0.5d0)domain_contains_point=.true.
-
     end select
     return
   end function domain_contains_point
 
-
+  
 
   function domain_fully_contains_cell(x,dx,dom)
     ! -> returns T/F if the full cell at x, of size dx, is in domain dom.
@@ -464,7 +417,6 @@ contains
     select case(trim(dom%type))
 
     case('sphere')
-
        ! correct cell's position for periodic boundaries
        ddx = x(1)-dom%sp%center(1)
        if (ddx > 0.5d0) then 
@@ -472,21 +424,18 @@ contains
        else if (ddx < -0.5d0) then 
           ddx = ddx + 1.0d0
        end if
-
        ddy = x(2)-dom%sp%center(2)
        if (ddy > 0.5d0) then 
           ddy = ddy -1.0d0 
        else if (ddy < -0.5d0) then 
           ddy = ddy + 1.0d0
        end if
-
        ddz = x(3)-dom%sp%center(3)
        if (ddz > 0.5d0) then 
           ddz = ddz -1.0d0 
        else if (ddz < -0.5d0) then 
           ddz = ddz + 1.0d0
        end if
-
        rr = sqrt(ddx**2 + ddy**2 + ddz**2)
        rr = rr + dx*sqrt3over2
        if (rr <= dom%sp%radius) domain_fully_contains_cell=.true.
@@ -544,11 +493,9 @@ contains
              else if (dd < -0.5d0) then 
                 xc = xc + 1.0d0
              end if
-
              if ((xc+dx*0.5d0 <= dom%cu%center(3)+dom%cu%size*0.5d0).and. &
                   (xc-dx*0.5d0 >= dom%cu%center(3)-dom%cu%size*0.5d0)) then
                 domain_fully_contains_cell=.true.
-
              end if
           end if
        end if
@@ -563,7 +510,6 @@ contains
        end if
        if((xc+dx*0.5d0 <= dom%sl%zc+dom%sl%thickness*0.5d0).and. &
             (xc-dx*0.5d0 >= dom%sl%zc-dom%sl%thickness*0.5d0)) domain_fully_contains_cell=.true.
-
        
     end select
 
@@ -704,10 +650,6 @@ contains
     enddo
     if(dmax<0.0d0 .or. imax==0)then
        print *,'ERROR: problem with get_my_new_domain'
-       print*,x,db
-       print*,i,ndom
-       print*,liste_domaines(1)%sp%center(:)
-       print*,liste_domaines(1)%sp%radius
        stop
     endif
     get_my_new_domain = imax
@@ -727,30 +669,25 @@ contains
     select case(trim(dom%type))
 
     case('sphere')
-
        ! correct position for periodic boundaries
-
        ddx = x(1)-dom%sp%center(1)
        if (ddx > 0.5d0) then 
           ddx = ddx -1.0d0 
        else if (ddx < -0.5d0) then 
           ddx = ddx + 1.0d0
        end if
-
        ddy = x(2)-dom%sp%center(2)
        if (ddy > 0.5d0) then 
           ddy = ddy -1.0d0 
        else if (ddy < -0.5d0) then 
           ddy = ddy + 1.0d0
        end if
-
        ddz = x(3)-dom%sp%center(3)
        if (ddz > 0.5d0) then 
           ddz = ddz -1.0d0 
        else if (ddz < -0.5d0) then 
           ddz = ddz + 1.0d0
        end if
-
        !rr = sqrt((x(1)-dom%sp%center(1))**2 + (x(2)-dom%sp%center(2))**2 + (x(3)-dom%sp%center(3))**2)
        rr = sqrt(ddx**2 + ddy**2 + ddz**2)
        domain_distance_to_border = dom%sp%radius - rr
@@ -780,7 +717,6 @@ contains
        domain_distance_to_border = min((rr-dom%sh%r_inbound),(dom%sh%r_outbound-rr))
        
     case('cube')
-
        ! correct cell's position for periodic boundaries 
        xc = x(1)
        ddx = xc - dom%cu%center(1)
@@ -848,7 +784,6 @@ contains
     ! variables for the cube case
     real(kind=8),dimension(3) :: x_dom,xc
     integer(kind=4) :: i
-
     ! variables for the slab case
     real(kind=8) :: zc
     
@@ -861,30 +796,25 @@ contains
     select case(trim(dom%type))
        
     case('sphere')
-
        ! correct position for periodic boundaries
-
        dx = x(1)-dom%sp%center(1)
        if (dx > 0.5d0) then 
           dx = dx -1.0d0 
        else if (dx < -0.5d0) then 
           dx = dx + 1.0d0
        end if
-
        dy = x(2)-dom%sp%center(2)
        if (dy > 0.5d0) then 
           dy = dy -1.0d0 
        else if (dy < -0.5d0) then 
           dy = dy + 1.0d0
        end if
-
        dz = x(3)-dom%sp%center(3)
        if (dz > 0.5d0) then 
           dz = dz -1.0d0 
        else if (dz < -0.5d0) then 
           dz = dz + 1.0d0
        end if
-
        !dx = x(1) - dom%sp%center(1)
        !dy = x(2) - dom%sp%center(2)
        !dz = x(3) - dom%sp%center(3)
@@ -966,9 +896,7 @@ contains
        endif
 
     case('cube')  
-
        ! correct position for periodic boundaries
-
        do i = 1,3
           xc(i) = x(i)
           ddx = xc(i) - dom%cu%center(i)
@@ -998,6 +926,7 @@ contains
     return
     
   end function domain_distance_to_border_along_k
+
 
 
   subroutine domain_get_bounding_box(dom,xmin,xmax,ymin,ymax,zmin,zmax)
@@ -1038,6 +967,8 @@ contains
     
     return
   end subroutine domain_get_bounding_box
+
+
 
 end module module_domain
 
