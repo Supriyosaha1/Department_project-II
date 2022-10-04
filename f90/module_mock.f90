@@ -1,9 +1,6 @@
 module module_mock
 
   use module_constants, only:clight,planck
-  !--FILTER--
-  use module_filter
-  !--RETLIF-- 
   
   private
 
@@ -45,9 +42,6 @@ module module_mock
   character(2000) :: mock_parameter_file
   character(2000) :: mock_outputfilename  ! Prefix for output mock files (including absolute path)
                                           ! -> will be followed by ".image" or ".spectrum" or ".cube"
-  !--FILTER--
-  logical         :: use_filter = .false. ! use a filter response curve when computing images. 
-  !--RETLIF--
   ! --------------------------------------------------------------------------
   ! for statistics
   integer(kind=4) :: peels_count,rays_count
@@ -58,7 +52,7 @@ module module_mock
 
   
   ! public variables 
-  public :: peeling_off, nDirections, mock, use_filter
+  public :: peeling_off, nDirections, mock
   public :: peels_count,rays_count,detectors_count
 
   ! public functions 
@@ -412,17 +406,11 @@ contains
              write(mock_parameter_file,'(a)') trim(value)
           case ('mock_outputfilename')
              write(mock_outputfilename,'(a)') trim(value)
-          case ('use_filter')
-             read(value,*) use_filter
           end select
        end do
     end if
     close(10)
 
-    !--FILTER--
-    if (use_filter) call read_filter_params(pfile)
-    !--RETLIF-- 
-    
     call mock_init
        
     return
@@ -444,11 +432,7 @@ contains
        write(unit,'(a,i8)')    '  nDirections         = ',nDirections
        write(unit,'(a,a)')     '  mock_parameter_file = ',trim(mock_parameter_file)
        write(unit,'(a,a)')     '  mock_outputfilename = ',trim(mock_outputfilename)
-       write(unit,'(a,L1)')    '  use_filter          = ',use_filter
        write(unit,'(a)')       ' '
-       !--FILTER--
-       if (use_filter) call print_filter_params(unit)
-       !--RETLIF--
     else
        write(*,'(a)')          '--------------------------------------------------------------------------------'
        write(*,'(a)')          ' '
@@ -456,13 +440,9 @@ contains
        write(*,'(a,i8)')       '  nDirections         = ',nDirections
        write(*,'(a,a)')        '  mock_parameter_file = ',trim(mock_parameter_file)
        write(*,'(a,a)')        '  mock_outputfilename = ',trim(mock_outputfilename)
-       write(*,'(a,L1)')       '  use_filter          = ',use_filter
-       write(*,'(a)')          ' '       
+       write(*,'(a)')          ' '
        write(*,'(a)')          '--------------------------------------------------------------------------------'
        write(*,'(a)')          ' '
-       !--FILTER--
-       if (use_filter) call print_filter_params
-       !--RETLIF--
     end if
 
     return

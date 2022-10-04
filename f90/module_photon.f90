@@ -7,9 +7,6 @@ module module_photon
   use module_domain
   use module_utils
   use module_mock
-  !--FILTER-- 
-  use module_filter
-  !--RETLIF-- 
 
   implicit none
 
