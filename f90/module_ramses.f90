@@ -2671,38 +2671,6 @@ contains
   end subroutine get_fields_from_descriptor
 
 
-  subroutine get_fields_from_descriptor(dir,ts,nfields)
-
-    implicit none
-
-    character(1000),intent(in)  :: dir
-    integer(kind=4),intent(in)  :: ts
-    integer(kind=4),intent(out) :: nfields
-    character(2000)             :: filename,line,iv,name
-    integer(kind=4) :: i,j,err,ivar
-
-    write(filename,'(a,a,i5.5,a,i5.5,a)') trim(dir),'/output_',ts,'/part_file_descriptor.txt'
-    open(unit=50,file=filename,status='old',action='read',form='formatted')
-    nfields = 0
-    do
-       read (50,'(a)',iostat=err) line
-       if(err/=0) exit
-       ! format should be ivar, var_name, descriptor
-       i = scan(line, ',')
-       j = scan(line, ',', .true.)  ! We need the second comma
-       if(i==0 .or. line(1:1)=='#') cycle  ! skip empty/commented lines
-       name = trim(adjustl(line(i+1:j-1)))
-       iv = trim(adjustl(line(:i-1)))
-       read(iv,*) ivar
-       ParticleFields(ivar) = name
-       nfields = nfields + 1
-    end do
-    close(50)
-
-    return
-
-  end subroutine get_fields_from_descriptor
-
 
   !*****************************************************************************************************************
 
@@ -3151,37 +3119,6 @@ contains
 
   end function get_tot_nstars_families
 
-
-  
-
-  function get_tot_nstars_families(dir, ts)
-    
-    implicit none
-
-    integer(kind=4),intent(in) :: ts
-    character(1000),intent(in) :: dir
-    character(2000)            :: filename,line,v
-    integer(kind=4)            :: i,j,err
-    integer(kind=4)            :: get_tot_nstars_families
-
-    get_tot_nstars_families = 0
-    write(filename,'(a,a,i5.5,a,i5.5,a)') trim(dir),'/output_',ts,'/header_',ts,'.txt'
-    open(unit=50,file=filename,status='old',action='read',form='formatted')
-
-    do
-       read (50,'(a)',iostat=err) line
-       if(err/=0) exit
-       i = index(line, 'star')
-       j = index(line, 'star_tracer')
-       if (i/=0 .and. j==0) then
-          ! We have found the entry with stars and not the tracer one
-          v = trim(adjustl(line(i+len('star'):)))
-          read(v,*) get_tot_nstars_families
-       end if
-    end do
-    close(50)    
-
-  end function get_tot_nstars_families
 
 
   ! conformal time utils :

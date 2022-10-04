@@ -48,7 +48,6 @@ module module_mock
   !--FILTER--
   logical         :: use_filter = .false. ! use a filter response curve when computing images. 
   !--RETLIF--
-  logical         :: verbose = .false.
   ! --------------------------------------------------------------------------
   ! for statistics
   integer(kind=4) :: peels_count,rays_count
@@ -430,6 +429,7 @@ contains
 
   end subroutine read_mock_params
 
+
   subroutine print_mock_params(unit)
 
     ! ---------------------------------------------------------------------------------
@@ -440,7 +440,7 @@ contains
     integer(kind=4),optional,intent(in) :: unit
 
     if (present(unit)) then 
-       write(unit,'(a,a,a)')   '[mock]'
+       write(unit,'(a)')       '[mock]'
        write(unit,'(a,i8)')    '  nDirections         = ',nDirections
        write(unit,'(a,a)')     '  mock_parameter_file = ',trim(mock_parameter_file)
        write(unit,'(a,a)')     '  mock_outputfilename = ',trim(mock_outputfilename)
@@ -452,7 +452,7 @@ contains
     else
        write(*,'(a)')          '--------------------------------------------------------------------------------'
        write(*,'(a)')          ' '
-       write(*,'(a,a,a)')      '[mock]'
+       write(*,'(a)')          '[mock]'
        write(*,'(a,i8)')       '  nDirections         = ',nDirections
        write(*,'(a,a)')        '  mock_parameter_file = ',trim(mock_parameter_file)
        write(*,'(a,a)')        '  mock_outputfilename = ',trim(mock_outputfilename)
@@ -463,34 +463,6 @@ contains
        !--FILTER--
        if (use_filter) call print_filter_params
        !--RETLIF--
-    end if
-
-    return
-
-  end subroutine print_mock_params
-
-
-  subroutine print_mock_params(unit)
-
-    ! ---------------------------------------------------------------------------------
-    ! write parameter values to std output or to an open file if argument unit is
-    ! present.
-    ! ---------------------------------------------------------------------------------
-
-    integer(kind=4),optional,intent(in) :: unit
-
-    if (present(unit)) then 
-       write(unit,'(a)')             '[mock]'
-       write(unit,'(a,i8)')          '  nDirections         = ',nDirections
-       write(unit,'(a,a)')           '  mock_parameter_file = ',trim(mock_parameter_file)
-       write(unit,'(a,a)')           '  mock_outputfilename = ',trim(mock_outputfilename)
-       write(unit,'(a)')             ' '
-    else
-       write(*,'(a)')             '[mock]'
-       write(*,'(a,i8)')          '  nDirections         = ',nDirections
-       write(*,'(a,a)')           '  mock_parameter_file = ',trim(mock_parameter_file)
-       write(*,'(a,a)')           '  mock_outputfilename = ',trim(mock_outputfilename)
-       write(*,'(a)')             ' '       
     end if
 
     return
