@@ -5,9 +5,11 @@ module module_photon
   use module_constants
   use module_random
   use module_domain
-  use module_utils
+  use module_utils, only: path 
+  !--PEEL--
   use module_mock
-
+  !--LEEP--
+  
   implicit none
 
   ! 2 types for photons, one for the initial properties is called photon_init
@@ -19,7 +21,7 @@ module module_photon
      real(kind=8),dimension(3) :: xlast        ! coordinates of last interaction in box units
      real(kind=8),dimension(3) :: xcurr        ! current position of the photon in box units
      real(kind=8)              :: nu_ext       ! external frame frequency (Hz)
-     real(kind=8),dimension(3) :: k            ! normalised propagation vector
+     real(kind=8),dimension(3) :: k            ! normalised propagation vector 
      integer(kind=4)           :: nb_abs       ! number of interactions before escape
      real(kind=8)              :: time         ! time in [s] from emission to escape/absorption        
      real(kind=8)              :: tau_abs_curr ! current optical depth (useful when photon change mesh domain)
@@ -38,7 +40,6 @@ module module_photon
      real(kind=8),dimension(3) :: v_em     ! velocity of the source -- for peeling off
   end type photon_init
 
-  !logical::HI_core_skip=.false.
   !--PEEL--
   type peel
      real(kind=8)              :: nu     ! frequency before scattering, converted to freq. after virtual scat. towards dir. of observation. 
@@ -54,10 +55,10 @@ module module_photon
   integer(kind=4)                      :: nPeeled
   !--LEEP--
 
-
   public  :: MCRT, propagate, init_photons_from_file, dump_photons
-  
+
 contains
+
 
   subroutine MCRT(npp,photpacket,mesh_dom,compute_dom)
 
@@ -75,14 +76,16 @@ contains
           call propagate(photpacket(i),mesh_dom,compute_dom)
        endif
     enddo
-    
+ 
   end subroutine MCRT
 
 
-  subroutine propagate(p,domesh,domaine_calcul)    
+
+  subroutine propagate(p,domesh,domaine_calcul)
+
     type(photon_current),intent(inout)   :: p              ! photon 
     type(mesh),intent(in)                :: domesh         ! mesh
-    type(domain)                         :: domaine_calcul ! computational domain in which photons are propagating,  changes for each photon
+    type(domain),intent(in)              :: domaine_calcul ! computational domain in which photons are propagating
     
     type(gas)                            :: cell_gas                   ! gas in the current cell 
     integer(kind=4)                      :: icell, ioct, ind, ileaf, cell_level  ! current cell indices and level
@@ -94,26 +97,16 @@ contains
     real(kind=8),dimension(3)            :: vgas, k, cell_corner, posoct, pcell
     logical                              :: cell_fully_in_domain, flagoutvol, in_domain, OutOfDomainBeforeCell
     real(kind=8)                         :: dborder, dborder_cm, error
-    !--PEEL--
-    real(kind=8) :: x ! a random number
-    !--LEEP--
     !--CORESKIP--
     real(kind=8)                         :: xcrit,dist_cm
     !--PIKSEROC--
+    
     
     ! initialise working props of photon
     ppos    = p%xcurr        ! position within full simulation box, in box units.
     time    = p%time
     tau_abs = p%tau_abs_curr
     iran    = p%iran
-
-
-    ! check that the photon is actually in the computational domain ...
-    in_domain = domain_contains_point(ppos,domaine_calcul)
-    if (.not. in_domain) then
-       print*,'Propagate called for photon outside domain ... '
-       stop
-    end if
 
     ! find cell in which the photon is, and define all its indices
     icell = in_cell_finder(domesh,ppos)
@@ -136,18 +129,20 @@ contains
        PeelBuffer(nPeeled)%weight = 0.5      ! assume isotropy for this particular (non-)event
        PeelBuffer(nPeeled)%nu     = p%nu_ext ! frequency in the direction of observation
        PeelBuffer(nPeeled)%scatter_flag = -1 ! flag peel as an initial peel
+       ! JB-
        PeelBuffer(nPeeled)%kin = p%k ! emission direction (nu is in this direction, not in the direction to mock observer)
+       ! -JB 
        PeelBuffer(nPeeled)%v_src = p%v_src
        if (nPeeled == PeelBufferSize) then ! buffer is full -> process.
           call process_peels(domesh,domaine_calcul,iran)
           nPeeled=0
        endif
     end if
-    !--LEEP--
-    
+    !--LEEP-- 
+
     ! propagate photon until escape or death ... 
     photon_propagation : do 
-       
+
        ! gather properties properties of current cell
        cell_level   = domesh%octlevel(ioct)      ! level of current cell
        cell_size    = 0.5d0**cell_level          ! size of current cell in box units
@@ -162,7 +157,7 @@ contains
           print*,"ERROR: problem in computing ppos_cell"
           stop
        endif
-       
+
        ! get gas velocity (in cgs units)
        vgas         = get_gas_velocity(cell_gas)
        ! compute photon's frequency in cell's moving frame
@@ -173,18 +168,8 @@ contains
        pcell = cell_corner + 0.5d0*cell_size
        cell_fully_in_domain = domain_fully_contains_cell(pcell,cell_size,domaine_calcul)
 
-       ! !--CORESKIP--
-       ! if (HI_core_skip) then 
-       !    delta_nu_doppler = cell_gas%dopwidth/(1215.67d0/cmtoA)
-       !    a    = 6.265d8/fourpi/delta_nu_doppler
-       !    xcw  = 6.9184721d0 + 81.766279d0 / (log10(a)-14.651253d0)  ! Smith+15, Eq. 21
-       !    nu_0 = clight /(1215.67d0/cmtoA)
-       ! end if
-       ! !--PIKSEROC--
-       
-
        propag_in_cell : do
-
+          
           ! generate the opt depth where the photon is scattered/absorbed
           if (tau_abs <= 0.0d0) then
              rtau    = ran3(iran)
@@ -208,7 +193,7 @@ contains
                 distance_to_border           = distance_to_border_cm / cell_size_cm
              end if
           endif
-
+          
           ! check whether scattering occurs within cell or domain (scatter_flag > 0) or not (scatter_flag==0)
           !--CORESKIP--
           ! also compute xcrit for core-skipping if needed
@@ -307,7 +292,7 @@ contains
 
           else
              ! Next event happens inside this cell and in the domain.
-             
+
              ! length and time travelled by the photon before event
              d    = distance_to_border_cm   ! NB: at this point, distance_to_border became "distance_to_interaction" in gas_get_scatter_flag
              time = time + d/clight
@@ -319,7 +304,6 @@ contains
              enddo
              ! update ppos according to ppos_cell
              ppos = ppos_cell * cell_size + cell_corner
-
 
              !------------
              ! scattering
@@ -351,8 +335,6 @@ contains
              !call gas_scatter(scatter_flag, cell_gas, nu_cell, k, nu_ext, iran)    ! NB: nu_cell, k, nu_ext, and iran en inout             
              !--PIKSEROC--
              p%nu_ext = nu_ext
-
-
              ! NB: for TEST case, to have photons propagating straight on, comment the following line
              p%k = k
              ! there has been an interaction -> reset tau_abs
@@ -368,12 +350,12 @@ contains
                 p%iran         = iran
                 exit photon_propagation
              endif
+
           end if
 
        end do propag_in_cell
 
     end do photon_propagation
-
     !--PEEL--
     ! finish processing peel buffer before moving to next photon packet. 
     if (peeling_off) then 
@@ -385,7 +367,6 @@ contains
     !--LEEP-- 
 
     
-
     ! End of the photon propagation. There are 3 possible cases:
     !   1/ photon is out of the computational domain == escaped           -> in_domain=.false. && p%status=1
     !   2/ photon is out of mesh-cpu domain -> sent back to master, etc.  -> flagoutvol==.true.
@@ -404,7 +385,6 @@ contains
 
   end subroutine propagate
   
-
   !--PEEL--
   function tau_to_border(p,domesh,domaine_calcul,tau_max,kobs)
 
@@ -464,7 +444,7 @@ contains
        ! define/update flag_cell_fully_in_comp_dom to avoid various tests in the following
        pcell = cell_corner + 0.5d0*cell_size
        cell_fully_in_domain = domain_fully_contains_cell(pcell,cell_size,domaine_calcul)
-
+       
        ! compute distance of photon to border of cell along propagation direction
        distance_to_border           = path(ppos_cell,kobs)                  ! in cell units
        distance_to_border_cm        = distance_to_border * cell_size_cm     ! cm
@@ -500,7 +480,7 @@ contains
        enddo
 
 
-       if (OutOfDomainBeforeCell) then ! photon exits computational domain and is done
+       if (OutOfDomainBeforeCell) then ! photon exits computational domain and is done 
           exit photon_propagation
        end if
 
@@ -515,6 +495,11 @@ contains
           ppos(1) = ppos(1) + merge(-1.0d0,1.0d0,kobs(1)<0.0d0) * epsilon(ppos(1))
           ppos(2) = ppos(2) + merge(-1.0d0,1.0d0,kobs(2)<0.0d0) * epsilon(ppos(2))
           ppos(3) = ppos(3) + merge(-1.0d0,1.0d0,kobs(3)<0.0d0) * epsilon(ppos(3))
+          ! correct for periodicity
+          do i=1,3
+             if (ppos(i) < 0.0d0) ppos(i)=ppos(i)+1.0d0
+             if (ppos(i) > 1.0d0) ppos(i)=ppos(i)-1.0d0
+          enddo
           call whereIsPhotonGoing(domesh,icell,ppos,icellnew,flagoutvol)
           if (npush == 10) then
              print*,'npush == 10 ... using les grands moyens ... '
@@ -533,10 +518,10 @@ contains
              stop
           end if
        end do
-       if (npush > 1) print*,'WARNING : npush > 1 needed in module_photon:tau_to_border'
+       if (npush > 1) print*,'WARNING : npush > 1 needed in module_photon:propagate.'
        ! test whether photon was pushed out of domain with the extra pushes
        ! (and in that case, call it done). 
-       if (npush > 0) then
+       if (npush > 0) then 
           in_domain = domain_contains_point(ppos,domaine_calcul)
           if (.not. in_domain) then
              print*,'WARNING: pushed photon outside domain ... '
@@ -611,7 +596,7 @@ contains
              ! -JB
              tau = tau_to_border(PeelBuffer(ipeel),domesh,domaine_calcul,tau_max,kobs)
           end if
-          ! if tau is not absurdly large, increment detectors
+          ! if tau is not absurdly large, increment detectors 
           if (tau < tau_max) then
              detectors_count(idir) = detectors_count(idir) + 1
              peel_contrib = PeelBuffer(ipeel)%weight * exp(-tau) * 2.0d0 
@@ -626,6 +611,7 @@ contains
     
   end subroutine process_peels
   !--LEEP--
+
 
   subroutine init_photons_from_file(file,pgrid)
 
@@ -649,7 +635,6 @@ contains
     read(14) (pgridinit(i)%v_em(:),i=1,n_photon)
     close(14)
 
-    
     ! build photgrid current
     allocate(pgrid(n_photon))
     do i=1,n_photon
@@ -667,7 +652,6 @@ contains
        pgrid(i)%iran         = pgridinit(i)%iran
        pgrid(i)%v_src        = pgridinit(i)%v_em
     enddo
-
     deallocate(pgridinit)
 
   end subroutine init_photons_from_file
@@ -677,13 +661,11 @@ contains
   subroutine restore_photons(file,pgrid)
 
     character(2000),intent(in)                                 :: file
-    character(2000)                                            :: filename
     type(photon_current),dimension(:),allocatable, intent(out) :: pgrid
     integer(kind=4)                                            :: i, np
 
     ! restore photons from saved file
-    write(filename,'(a,a)') trim(file),'.bak'
-    open(unit=16, file=trim(filename), status='old', form='unformatted', action='read')
+    open(unit=16, file=trim(file), status='old', form='unformatted', action='read')
     read(16) np
 
     allocate(pgrid(np))
@@ -751,6 +733,5 @@ contains
     close(14)
 
   end subroutine dump_photons
-
 
 end module module_photon
