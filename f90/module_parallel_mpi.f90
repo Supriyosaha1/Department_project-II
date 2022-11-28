@@ -1,13 +1,8 @@
 module module_parallel_mpi
 
   use mpi
-  ! GATHER -- 
   use module_photon
-  ! -- GATHER
-  !--PEEL-- 
   use module_mock
-  !--LEEP--
-
 
   implicit none
 
@@ -35,6 +30,9 @@ contains
   !|| subroutine finish_mpi
   !|| subroutine stop_mpi
   !|| subroutine define_mpi_type
+  !|| subroutine test_mpi_type
+  !|| subroutine send_mock_to_master
+  !|| subroutine master_receives_mock
   !||
   !\\==========================================
 
