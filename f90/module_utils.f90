@@ -320,54 +320,6 @@ contains
   end function anisotropic_probability_Dust
   !--LEEP--
 
-  
-    subroutine locate_age_Z(sed_met,sed_nmet,sed_age,sed_nage,met,age,xmet,xage,imet,iage)
-    
-    ! subroutine which locates the position j of a value x in an array xx of n elements
-    ! NB : here xx is double precision
-    
-    implicit none
-    
-    integer(kind=4),intent(in)           :: sed_nmet,sed_nage
-    real(kind=8),intent(in)              :: sed_met(sed_nmet),sed_age(sed_nage), met, age
-    integer(kind=4),intent(out)          :: iage, imet
-    real(kind=8),intent(out)             :: xage,xmet
-    integer(kind=4)                      :: j
-
-
-    ! locate bins and compute weights
-    if (met <= sed_met(1)) then 
-       imet = 1
-       xmet  = 1.0d0
-    else if (met >= sed_met(sed_nmet)) then 
-       imet  = sed_nmet-1
-       xmet = 0.0d0
-    else
-       do j = 2,sed_nmet
-          if (met <= sed_met(j)) exit
-       end do
-       imet = j-1
-       xmet = (sed_met(j)-met) / (sed_met(j)-sed_met(j-1))
-    end if
-
-    if (age <= sed_age(1)) then 
-       iage = 1
-       xage  = 1.0d0
-    else if (age >= sed_age(sed_nage)) then 
-       iage  = sed_nage-1
-       xage = 0.0d0
-    else
-       do j = 2,sed_nage
-          if (age <= sed_age(j)) exit
-       end do
-       iage = j-1
-       xage = (sed_age(j)-age) / (sed_age(j)-sed_age(j-1))
-    end if
-    
-    return
-    
-  end subroutine locate_age_Z
-  
 
   subroutine locatedb(xx,n,x,j)
     
