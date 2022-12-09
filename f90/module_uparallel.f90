@@ -43,11 +43,11 @@ contains
     real(kind=8),parameter        :: pi2=pi/2.
     integer(kind=4)               :: ctloc
 
-    ! if(a < 1.d-6) then
-    !    print*,'Error using module_uparallel.f90: get_uparallel: a too small'
-    !    STOP
-    ! endif
-
+    if(a < 1.d-6) then
+       print*,'Error using module_uparallel.f90: get_uparallel: a too small'
+       STOP
+    endif
+    
     signe=sign(dble(1),y)
     x=y*signe
     
