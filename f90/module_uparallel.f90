@@ -225,20 +225,19 @@ contains
           end do
        end if
        close(10)
+       ! encode method choice into an integer
+       select case(trim(method))
+       case('Semelin')
+          methodKey = 1
+       case('Smith')
+          methodKey = 2
+       case('RASCAS')
+          methodKey = 3
+       case default
+          print*,'ERROR: method not known in module_uparallel.f90: read_uparallel_params: ',trim(method)
+          stop
+       end select
     endif
-
-    select case(trim(method))
-    case('Semelin')
-       methodKey = 1
-    case('Smith')
-       methodKey = 2
-    case('RASCAS')
-       methodKey = 3
-    case default
-       print*,'ERROR: method not known in module_uparallel.f90: read_uparallel_params: ',trim(method)
-       stop
-    end select
-    
     isRead = .True.
     
     return
