@@ -608,7 +608,7 @@ contains
     
     ! Reading scatterer properties
     do i=1,nscatterer
-       call read_scatterer_params(trim(atomic_data_dir)//'/'//trim(scatterer_names(i))//'.dat', pfile, scatterer_list(i), i)
+       call read_scatterer_params(trim(atomic_data_dir)//'/'//trim(scatterer_names(i))//'.dat', pfile, scatterer_list(i))
     end do
 
     ! Calling a routine to compute the number of metallic ions, and others helpful variable defined at the beginning of this routine:
@@ -656,7 +656,12 @@ contains
        !    write(unit,'(a,ES10.3)') '  fix_vturb_kms   = ',fix_vturb_kms
        !    write(unit,'(a,ES10.3)') '  fix_box_size_cm = ',fix_box_size_cm
        ! endif
+       ! scatterer params
        write(unit,'(a)')             ' '
+       do i=1,nscatterer
+          write(unit,'(a,a,a)') '[',trim(scatterer_names(i)),']'
+          call print_scatterer_params(scatterer_list(i),unit)
+       end do
        call print_dust_params(unit)
     else
        write(*,'(a,a,a)') '[gas_composition]'
@@ -683,7 +688,13 @@ contains
        !    write(*,'(a,ES10.3)') '  fix_vturb       = ',fix_vturb
        !    write(*,'(a,ES10.3)') '  fix_box_size_cm = ',fix_box_size_cm
        ! endif
+
+       ! scatterer params
        write(*,'(a)')             ' '
+       do i=1,nscatterer
+          write(*,'(a,a,a)') '[',trim(scatterer_names(i)),']'
+          call print_scatterer_params(scatterer_list(i))
+       enddo
        call print_dust_params
     end if
 

@@ -148,6 +148,7 @@ contains
     upar = get_uparallel(x_cell,a,iran)
     upar = upar * dopwidth    ! upar is an x -> convert to a velocity 
 
+    
     ! 2/ component perpendicular to photon's propagation
     ruper  = ran3(iran)
     r2     = ran3(iran)
@@ -329,7 +330,7 @@ contains
 
 
 
-  subroutine read_scatterer_params(sfile,pfile,s,index_call_read)
+  subroutine read_scatterer_params(sfile,pfile,s)
     
     ! ---------------------------------------------------------------------------------
     ! subroutine which reads parameters scatterer in the atomic parameter file pfile
@@ -337,7 +338,6 @@ contains
 
     character(*),intent(in)       :: sfile,pfile
     type(scatterer),intent(inout) :: s
-    integer(kind=4),intent(in)    :: index_call_read ! If 1, call read voigt and uparallel params, otherwise not
     character(1000)               :: line,name,value
     integer(kind=4)               :: err,i
     logical                       :: file_exists
@@ -402,10 +402,8 @@ contains
     end if
     !--PIKSEROC-- 
     
-    if(index_call_read == 1) then
-       call read_uparallel_params(pfile)
-       call read_voigt_params(pfile)
-    end if
+    call read_uparallel_params(pfile)
+    call read_voigt_params(pfile)
 
     return
 
@@ -413,40 +411,62 @@ contains
 
 
   
-  subroutine print_scatterer_params(unit)
+  subroutine print_scatterer_params(s,unit)
     
     ! ---------------------------------------------------------------------------------
     ! write parameter values to std output or to an open file if argument unit is
     ! present.
     ! ---------------------------------------------------------------------------------
 
+    type(scatterer),intent(in)          :: s
     integer(kind=4),optional,intent(in) :: unit
+    integer(kind=4)                     :: j
 
-    write(unit,*) 'print_scatterer_params: to redo'
-
-    ! if (present(unit)) then 
-    !    write(unit,'(a,a,a)') '[HI]'
-    !    write(unit,'(a,L1)') '  recoil    = ',recoil
-    !    write(unit,'(a,L1)') '  isotropic = ',isotropic
-    !    !--CORESKIP--
-    !    write(unit,'(a,L1)')     '  core_skip = ',core_skip
-    !    write(unit,'(a,ES10.3)') '  xcritmax     = ',xcritmax
-    !    !--PIKSEROC--
-    !    write(unit,'(a)') ''
-    !    call print_uparallel_params(unit)
-    !    call print_voigt_params(unit)
-    ! else
-    !    write(*,'(a,a,a)') '[HI]'
-    !    write(*,'(a,L1)') '  recoil    = ',recoil
-    !    write(*,'(a,L1)') '  isotropic = ',isotropic
-    !    !--CORESKIP--
-    !    write(*,'(a,L1)')     '  core_skip = ',core_skip
-    !    write(*,'(a,ES10.3)') '  xcritmax     = ',xcritmax
-    !    !--PIKSEROC--
-    !    write(*,'(a)') ''
-    !    call print_uparallel_params()
-    !    call print_voigt_params()
-    ! end if
+    if (present(unit)) then
+       write(unit,'(a,ES13.6)') '  m_ion          = ',s%m_ion
+       !write(unit,'(a,a)')      '  name_ion       = ',s(i)%name_ion
+       write(unit,'(a,f12.6)')  '  lambda [A]     = ',s%lambda_cm * cmtoA
+       write(unit,'(a,ES13.6)') '  f              = ',s%f
+       write(unit,'(a,ES13.6)') '  A              = ',s%A
+       write(unit,'(a,i2)')     '  n_fluo         = ',s%n_fluo
+       if(s%n_fluo>0)then
+          do j=1,s%n_fluo
+             write(unit,'(a,f12.6)') '  lambda_fluo [A] = ',s%lambda_fluo_cm(j) * cmtoA
+             write(unit,'(a,ES12.6)')'  A_fluo          = ',s%A_fluo(j)
+          end do
+       endif
+       write(unit,'(a,L)')      '  recoil         =  ',s%recoil
+       write(unit,'(a,L)')      '  isotropic      =  ',s%isotropic
+       write(unit,'(a,L)')      '  core_skip      =  ',s%core_skip
+       if(s%core_skip)then
+          write(unit,'(a,ES10.3)') '  xcritmax       = ',s%xcritmax
+       endif
+       write(unit,'(a)') ' '
+       call print_uparallel_params(unit)
+       call print_voigt_params(unit)
+    else
+       write(*,'(a,ES13.6)') '  m_ion          = ',s%m_ion
+       !write(*,'(a,a)')      '  name_ion       = ',s(i)%name_ion
+       write(*,'(a,f12.6)')  '  lambda [A]     = ',s%lambda_cm * cmtoA
+       write(*,'(a,ES13.6)') '  f              = ',s%f
+       write(*,'(a,ES13.6)') '  A              = ',s%A
+       write(*,'(a,i2)')     '  n_fluo         = ',s%n_fluo
+       if(s%n_fluo>0)then
+          do j=1,s%n_fluo
+             write(*,'(a,f12.6)') '  lambda_fluo [A] = ',s%lambda_fluo_cm(j) * cmtoA
+             write(*,'(a,ES12.6)')'  A_fluo          = ',s%A_fluo(j)
+          end do
+       endif
+       write(*,'(a,L)')      '  recoil         =  ',s%recoil
+       write(*,'(a,L)')      '  isotropic      =  ',s%isotropic
+       write(*,'(a,L)')      '  core_skip      =  ',s%core_skip
+       if(s%core_skip)then
+          write(*,'(a,ES10.3)') '  xcritmax       = ',s%xcritmax
+       endif
+       write(*,'(a)') ' '
+       call print_uparallel_params
+       call print_voigt_params
+    endif
     
     return
     
