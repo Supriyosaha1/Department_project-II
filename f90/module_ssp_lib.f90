@@ -2,7 +2,7 @@ module module_ssp_lib
   
   ! Module which contains declarations and routines/functions relative to the SSPs library
 
-  use module_utils
+  use module_utils, only: locatedb
   use module_constants
   
   private
