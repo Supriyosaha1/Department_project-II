@@ -21,12 +21,11 @@ module module_constants
   real(kind=8),parameter :: XH = 0.76d0
   real(kind=8),parameter :: amu = 1.66054d-24                 ![g] atomic mass unit
   real(kind=8),parameter :: msun = 1.989d33                   ![g] solar mass 
-  real(kind=8),parameter :: mSi = 28.085d0 * amu              ![g] mass of Silicon
-  real(kind=8),parameter :: mMg = 24.305d0 * amu              ![g] mass of Magnesium
-  real(kind=8),parameter :: mFe = 55.845d0 * amu              ![g] mass of Fer
-  ! Val
-  real(kind=8),parameter :: nu_LyA        = 2.46606398d15        ![Hz] frequency of LyA
-  ! laV
+  !real(kind=8),parameter :: mSi = 28.085d0 * amu              ![g] mass of Silicon
+  !real(kind=8),parameter :: mMg = 24.305d0 * amu              ![g] mass of Magnesium
+  !real(kind=8),parameter :: mFe = 55.845d0 * amu              ![g] mass of Fer
+  !--> supprimer les masses des ions, dans les fichiers ions dorenavant
+  real(kind=8),parameter :: lambda_LyA_Ang = 1215.67d0        ![A] wavelength of LyA line
 
 end module module_constants
 

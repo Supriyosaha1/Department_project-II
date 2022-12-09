@@ -22,7 +22,7 @@ program LyaPhotonsFromGas
   integer(kind=4)              :: ncpu_read
   real(kind=8),allocatable     :: low_prob_rec(:),low_prob_col(:)
   integer(kind=4)              :: ilow,iup,imid
-  real(kind=8)                 :: mid
+  real(kind=8)                 :: mid, nu_LyA
 
   ! ---------------------------------------------------------------------------
   ! user-defined parameters - read from section [LyaPhotonsFromGas] of the parameter file
@@ -126,6 +126,7 @@ program LyaPhotonsFromGas
      if (coll_em(i) > maxcol) maxcol = coll_em(i) 
   end do
   
+  nu_LyA = clight / lambda_LyA_Ang * cmtoA
   recomb_total = sum(recomb_em) / (planck*nu_LyA)  ! nb of photons per second
   coll_total   = sum(coll_em) / (planck*nu_LyA)  ! nb of photons per second
   

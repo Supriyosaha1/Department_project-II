@@ -1,6 +1,6 @@
 module module_ramses
 
-  use module_constants, only : kB, mp, XH, planck, clight, cmtoA
+  use module_constants, only : kB, mp, XH, planck, clight, cmtoA, lambda_LyA_Ang
   use module_domain
   use coolrates_module
   
@@ -127,12 +127,12 @@ contains
     integer(kind=4),allocatable,intent(inout) :: leaf_level_all(:)
     type(domain),intent(in),optional          :: selection_domain
     ! --- ions ---
-    character(2000),intent(in),optional       :: krome_data_dir
     integer(kind=4),intent(in)                :: metal_number
+    character(2000),intent(in),optional       :: krome_data_dir
     character(10),intent(in),optional         :: ions(metal_number)
     integer(kind=4)                           :: ileaf_cpu,nleaf_cpu        ! Useful to check that the number of leaf cells in the same in the Krome outputs as in Ramses outputs.
     ! --- snoi ---
-    integer(kind=4)                           :: ileaf,nleaf,k,icpu,ivar,iloop,nmetal
+    integer(kind=4)                           :: ileaf,nleaf,k,icpu,ivar,iloop
     real(kind=8)                              :: time1,time2,time3,rate
     integer(kind=8)                           :: c1,c2,c3,cr
     character(1000)                           :: filename 
@@ -1709,7 +1709,7 @@ contains
     integer(kind=4),intent(in),optional :: sample(:)
 
     integer(kind=4)            :: n,j,i
-    real(kind=8),parameter     :: e_lya = planck * clight / (1215.67d0/cmtoA) ! [erg] energy of a Lya photon (consistent with HI_model)
+    real(kind=8),parameter     :: e_lya = planck * clight / (lambda_LyA_Ang/cmtoA) ! [erg] energy of a Lya photon (consistent with HI_model)
     real(kind=8)               :: xhii,xheii,xheiii,nh,nhi,nhii,n_e,mu,TK,Ta,prob_case_B,alpha_B,collExrate_HI,lambda,nhe
     logical                    :: subsample
     
@@ -1781,7 +1781,7 @@ contains
     integer(kind=4),intent(in),optional :: sample(:)
 
     integer(kind=4)            :: n,j,i
-    real(kind=8),parameter     :: e_lya = planck * clight / (1215.67d0/cmtoA) ! [erg] energy of a Lya photon (consistent with HI_model)
+    real(kind=8),parameter     :: e_lya = planck * clight / (lambda_LyA_Ang/cmtoA) ! [erg] energy of a Lya photon (consistent with HI_model)
     real(kind=8)               :: xhii,xheii,xheiii,nh,nhi,nhii,n_e,mu,TK,Ta,prob_case_B,alpha_B,lambda,nhe,LyaEm
     logical                    :: subsample
     
@@ -2573,10 +2573,10 @@ contains
     dp_scale_d    = get_param_real(repository,snapnum,'unit_d')
     dp_scale_t    = get_param_real(repository,snapnum,'unit_t')
     dp_scale_nH   = XH/mp * dp_scale_d      ! convert mass density (code units) to numerical density of H atoms [/cm3]
-    dp_scale_nHe  = (1d0-XH)/4/mp * dp_scale_d ! mass dens to He/cm3
+    dp_scale_nHe  = (1.0d0-XH)/4.0d0/mp * dp_scale_d ! mass dens to He/cm3
     dp_scale_v    = dp_scale_l/dp_scale_t   ! -> converts velocities into cm/s
     dp_scale_T2   = mp/kB * dp_scale_v**2   ! -> converts P/rho to T/mu, in K
-    dp_scale_zsun = 1.d0/0.0127     
+    dp_scale_zsun = 1.0d0/0.0127d0
     dp_scale_m    = dp_scale_d * dp_scale_l**3 ! convert mass in code units to cgs. 
 
     return
