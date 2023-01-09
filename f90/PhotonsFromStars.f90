@@ -383,7 +383,7 @@ program PhotonsFromStars
         ! compute frequency in star frame... 
         ! 0/ compute the spectrum of the star particle
         call ssp_lib_interpolate(NdotGrid, star_age(ilow)/1.e3, log10(star_met(ilow)), Ndot)
-        Ndot = Ndot * star_minit(i) / msun  ! nb of photons / s / A
+        Ndot = Ndot * star_minit(ilow) / msun  ! nb of photons / s / A
         ncomputeperstar(ilow) = ncomputeperstar(ilow)+1
         
         ! 1/ find the frequency/lambda bin (updated/corrected 02-12-2022)
