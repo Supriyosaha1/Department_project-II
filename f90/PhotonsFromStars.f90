@@ -26,8 +26,8 @@ program PhotonsFromStars
   integer(kind=4)          :: ilow, iphot, iseed, ilow2
   real(kind=8)             :: lambda0, k(3), lambdamin, lambdamax, nu, spec_gauss_nu0, lambda_star, weight
 
-  real(kind=8)                :: start, finish, rate, intermed
-  integer(kind=8)             :: c1,c2,cr,c3
+  real(kind=8)             :: start, finish, rate, intermed
+  integer(kind=8)          :: c1,c2,cr,c3
 
   !JB-
   integer(kind=4),allocatable:: ncomputeperstar(:)
@@ -180,6 +180,8 @@ program PhotonsFromStars
      ! 4/ draw emitting stars from the weights
      ! 5/ draw frequency?
      
+!--------------------------------------------------------------------------------------
+!--------------------------------------------------------------------------------------
   case('Gauss')
 
      print*,'Gauss spectral type'
@@ -230,7 +232,6 @@ program PhotonsFromStars
         ! store velocity of the star, for peeling-off only
         v_em(:,iphot) = star_vel(:,ilow)
      end do
-
      
 !--------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------
@@ -268,13 +269,13 @@ program PhotonsFromStars
      allocate(low_prob2(NdotGrid%nlambda+1))
      iseed = ranseed
 
-     ! compute lbin
-     allocate(lbin(NdotGrid%nlambda))
+     ! compute lbin (updated/corrected 02-12-2022)
+     allocate(lbin(0:NdotGrid%nlambda))
+     lbin(0) = lambdamin
      do i = 1,NdotGrid%nlambda-1
         lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
      enddo
-     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda) + (NdotGrid%lambda(i) - NdotGrid%lambda(i-1))/2.0d0
-     
+     lbin(NdotGrid%nlambda) = lambdamax
 
      do iphot = 1,nphotons
 
@@ -282,7 +283,6 @@ program PhotonsFromStars
 
         ! photon emitted from star ilow
         ! give photon the position of the star
-        !print*,iphot,ilow
         x_em(:,iphot) = star_pos(:,ilow) 
         ! draw propagation direction
         call isotropic_direction(k,iseed)
@@ -290,24 +290,19 @@ program PhotonsFromStars
 
         ! compute frequency in star frame... here is the difficulty....
 
-        ! 1/ find the frequency/lambda bin
+        ! 1/ find the frequency/lambda bin (updated/corrected 02-12-2022)
         low_prob2(1) = 0.0d0
-        low_prob2(2) = NdotStar(ilow,1) * (NdotGrid%lambda(2) - NdotGrid%lambda(1))/2.  ! => P(lambda(1)
-        do i = 3,NdotGrid%nlambda
-           low_prob2(i) = low_prob2(i-1) + NdotStar(ilow,i-1) * (NdotGrid%lambda(i) - NdotGrid%lambda(i-2))/2.
+        do i = 1, NdotGrid%nlambda
+           low_prob2(i+1) = low_prob2(i) + NdotStar(ilow,i) * (lbin(i) - lbin(i-1))
         end do
-        low_prob2 = low_prob2 / low_prob2(NdotGrid%nlambda)
-        low_prob2(NdotGrid%nlambda+1) = 1.1  ! higher than upper limit 
+        low_prob2 = low_prob2 / low_prob2(NdotGrid%nlambda+1)
         call binary_search(iseed, NdotGrid%nlambda, low_prob2, ilow2)
-        ! photon emitted in the bin ilow2;ilow2+1
-        ! => photon emitted at Ndot(ilow2), which means lambda between lambda(ilow2)+lambda(ilow2-1)/2. and  lambda(ilow2+1)+lambda(ilow2)/2. 
-        ! if ilow2 = 1 => lambda between lambda(1) and  lambda(2)+lambda(1)/2.
-        ! if ilow2 = nlambda => lambda between lambda(ilow2)+lambda(ilow2-1)/2. and lambda(ilow2)
-        
+        ! photon emitted in the bin lbin(ilow2-1) and lbin(ilow2)
+
         ! 2/ get lamba_em
-        ! 0th order solution is a flat distribution in this bin
+        ! 0th order solution is a flat distribution in this bin (updated/corrected 02-12-2022)
         r2 = ran3(iseed)
-        lambda_star = lbin(ilow2) + r2 * (lbin(ilow2+1)-lbin(ilow2))
+        lambda_star = lbin(ilow2-1) + r2 * (lbin(ilow2)-lbin(ilow2-1))
         
         nu_star(iphot) = clight / (lambda_star*1e-8) ! Hz
         ! compute frequency in external frame 
@@ -318,7 +313,7 @@ program PhotonsFromStars
         v_em(:,iphot) = star_vel(:,ilow)
      enddo
      
-
+!--------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------
   !JB-
   case('Table_lowmem')
@@ -363,13 +358,13 @@ program PhotonsFromStars
      allocate(low_prob2(NdotGrid%nlambda+1))
      iseed = ranseed
 
-     ! compute lbin
-     allocate(lbin(NdotGrid%nlambda))
+     ! compute lbin (updated/corrected 02-12-2022)
+     allocate(lbin(0:NdotGrid%nlambda))
+     lbin(0) = lambdamin
      do i = 1,NdotGrid%nlambda-1
         lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
      enddo
-     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda) + (NdotGrid%lambda(i) - NdotGrid%lambda(i-1))/2.0d0
-
+     lbin(NdotGrid%nlambda) = lambdamax
      
      allocate(ncomputeperstar(nstars))
      ncomputeperstar(:) = 0
@@ -391,24 +386,19 @@ program PhotonsFromStars
         Ndot = Ndot * star_minit(i) / msun  ! nb of photons / s / A
         ncomputeperstar(ilow) = ncomputeperstar(ilow)+1
         
-        ! 1/ find the frequency/lambda bin
+        ! 1/ find the frequency/lambda bin (updated/corrected 02-12-2022)
         low_prob2(1) = 0.0d0
-        low_prob2(2) = Ndot(1) * (NdotGrid%lambda(2) - NdotGrid%lambda(1))/2.  ! => P(lambda(1)
-        do i = 3,NdotGrid%nlambda
-           low_prob2(i) = low_prob2(i-1) + Ndot(i-1) * (NdotGrid%lambda(i) - NdotGrid%lambda(i-2))/2.
+        do i = 1, NdotGrid%nlambda
+           low_prob2(i+1) = low_prob2(i) + NdotStar(ilow,i) * (lbin(i) - lbin(i-1))
         end do
-        low_prob2 = low_prob2 / low_prob2(NdotGrid%nlambda)
-        low_prob2(NdotGrid%nlambda+1) = 1.1  ! higher than upper limit 
+        low_prob2 = low_prob2 / low_prob2(NdotGrid%nlambda+1)
         call binary_search(iseed, NdotGrid%nlambda, low_prob2, ilow2)
-        ! photon emitted in the bin ilow2;ilow2+1
-        ! => photon emitted at Ndot(ilow2), which means lambda between lambda(ilow2)+lambda(ilow2-1)/2. and  lambda(ilow2+1)+lambda(ilow2)/2. 
-        ! if ilow2 = 1 => lambda between lambda(1) and  lambda(2)+lambda(1)/2.
-        ! if ilow2 = nlambda => lambda between lambda(ilow2)+lambda(ilow2-1)/2. and lambda(ilow2)
+        ! photon emitted in the bin lbin(ilow2-1) and lbin(ilow2)
         
         ! 2/ get lamba_em
-        ! 0th order solution is a flat distribution in this bin
+        ! 0th order solution is a flat distribution in this bin (updated/corrected 02-12-2022)
         r2 = ran3(iseed)
-        lambda_star = lbin(ilow2) + r2 * (lbin(ilow2+1)-lbin(ilow2))
+        lambda_star = lbin(ilow2-1) + r2 * (lbin(ilow2)-lbin(ilow2-1))
         
         nu_star(iphot) = clight / (lambda_star*1e-8) ! Hz
         ! compute frequency in external frame 
@@ -431,10 +421,8 @@ program PhotonsFromStars
      print*,'nb of SED computations which could have been saved : ', ilow
      print*,'sampling a number of stars ',ilow2
         
-! --------------------------------------------------------------------------------------
-
-
-! --------------------------------------------------------------------------------------
+!--------------------------------------------------------------------------------------
+!--------------------------------------------------------------------------------------
   case('Mono')
      
      print*,'Monochromatic spectral type'
@@ -483,6 +471,7 @@ program PhotonsFromStars
         v_em(:,iphot) = star_vel(:,ilow)
      end do
 
+!--------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------
   case('Flat')
      print*,'Not implemented yet...'
@@ -558,7 +547,7 @@ contains
     return
   end subroutine compute_cum_low_prob
 
-  
+
   subroutine read_PhotonsFromStars_params(pfile)
 
     ! ---------------------------------------------------------------------------------
