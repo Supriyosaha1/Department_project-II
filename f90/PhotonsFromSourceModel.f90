@@ -94,14 +94,14 @@ program PhotonsFromSourceModel
      if (verbose) write(*,*) 'Total luminosity (nb of photons per second): ',total_flux
      
      allocate(low_prob2(NdotGrid%nlambda+1))
-     ! compute lbin
-     allocate(lbin(NdotGrid%nlambda))
-     lbin(1) = NdotGrid%lambda(1)
-     do i = 2,NdotGrid%nlambda-1
+     ! compute lbin (updated/corrected 02-12-2022)
+     allocate(lbin(0:NdotGrid%nlambda))
+     lbin(0) = lambdamin
+     do i = 1,NdotGrid%nlambda-1
         lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
      enddo
-     lbin(NdotGrid%nlambda) = NdotGrid%lambda(NdotGrid%nlambda)
-
+     lbin(NdotGrid%nlambda) = lambdamax
+     
   end if
 
   
@@ -150,24 +150,19 @@ program PhotonsFromSourceModel
         
      case('Table')
 
-        ! 1/ find the frequency/lambda bin
+        ! 1/ find the frequency/lambda bin (updated/corrected 02-12-2022)
         low_prob2(1) = 0.0d0
-        low_prob2(2) = Ndot(1) * (NdotGrid%lambda(2) - NdotGrid%lambda(1))/2.  ! => P(lambda(1)
-        do j = 3,NdotGrid%nlambda
-           low_prob2(j) = low_prob2(j-1) + Ndot(j-1) * (NdotGrid%lambda(j) - NdotGrid%lambda(j-2))/2.
+        do j = 1, NdotGrid%nlambda
+           low_prob2(j+1) = low_prob2(j) + Ndot(j) * (lbin(j) - lbin(j-1))
         end do
-        low_prob2 = low_prob2 / low_prob2(NdotGrid%nlambda)
-        low_prob2(NdotGrid%nlambda+1) = 1.1  ! higher than upper limit 
+        low_prob2 = low_prob2 / low_prob2(NdotGrid%nlambda+1)
         call binary_search(iseed, NdotGrid%nlambda, low_prob2, ilow2)
-        ! photon emitted in the bin ilow2;ilow2+1
-        ! => photon emitted at Ndot(ilow2), which means lambda between lambda(ilow2)+lambda(ilow2-1)/2. and  lambda(ilow2+1)+lambda(ilow2)/2. 
-        ! if ilow2 = 1 => lambda between lambda(1) and  lambda(2)+lambda(1)/2.
-        ! if ilow2 = nlambda => lambda between lambda(ilow2)+lambda(ilow2-1)/2. and lambda(ilow2)
+        ! photon emitted in the bin lbin(ilow2-1) and lbin(ilow2)
         
         ! 2/ get lamba_em
-        ! 0th order solution is a flat distribution in this bin
+        ! 0th order solution is a flat distribution in this bin (updated/corrected 02-12-2022)
         r2 = ran3(iseed)
-        lambda_source = lbin(ilow2) + r2 * (lbin(ilow2+1)-lbin(ilow2))
+        lambda_source = lbin(ilow2-1) + r2 * (lbin(ilow2)-lbin(ilow2-1))
         
         nu = clight / (lambda_source*1e-8) ! Hz
 
