@@ -1,7 +1,7 @@
 ! SiII - 1526.72 line
 ! Parameters taken from https://physics.nist.gov/PhysRefData/ASD/lines_form.html
 
-m_ion          = 28.0855d0
+m_ion          = 28.085d0
 name_ion       = SiII
 lambda_cm      = 1.52672d-5                   
 A              = 3.81d8                              

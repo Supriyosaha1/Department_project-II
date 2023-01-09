@@ -1,11 +1,11 @@
-! CII - 1334.45 line
+! CII - 1334.53 line
 ! Parameters taken from https://physics.nist.gov/PhysRefData/ASD/lines_form.html
 
-m_ion          = 12.0164d0
+m_ion          = 12.011d0
 name_ion       = CII
-lambda_cm      = 1.334532d-5                   
-A              = 2.41d8                              
-f              = 1.29d-1               
+lambda_cm      = 1334.5323d-8
+A              = 2.41d8
+f              = 1.29d-1
 n_fluo         = 1
-lambda_fluo_cm = 1.335663d-5
+lambda_fluo_cm = 1335.6628d-8
 A_fluo         = 4.76d7
