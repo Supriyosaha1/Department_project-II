@@ -2829,9 +2829,10 @@ contains
 
 !$OMP PARALLEL &
 !$OMP DEFAULT(private) &
-!$OMP SHARED(ncpu_read, repository, snapnum, ParticleFields, nfields, selection_domain) &
+!$OMP SHARED(ncpu_read, repository, snapnum, ParticleFields, nfields, selection_domain, cpu_list) &
 !$OMP SHARED(h0, stime, dp_scale_t, dp_scale_m, dp_scale_v, boxsize, time_cu, aexp) &
-!$OMP SHARED(cosmo, use_proper_time, particle_families)) &
+!$OMP SHARED(cosmo, use_proper_time, particle_families) &
+!$OMP SHARED(recompute_particle_initial_mass) &
 !$OMP SHARED(ilast_all, star_pos_all, star_age_all, star_vel_all, star_minit_all, star_met_all)
 !$OMP DO
     cpuloop: do k=1,ncpu_read
@@ -2865,7 +2866,8 @@ contains
              ! JB-
              read_domain=.false.
              do i =1,npart
-                if (domain_contains_point(x(i,:),selection_domain)) then
+                temp(:) = x(i,:)
+                if (domain_contains_point(temp,selection_domain)) then
                    read_domain = .true.
                    exit
                 end if
@@ -2876,7 +2878,7 @@ contains
                 !print*,'skipping cpu ',icpu,irank
                 cycle cpuloop
              end if
-             print*,'--- reading cpu ',icpu,rank
+             !print*,'--- reading cpu ',icpu,rank
              !-JB
           case('position_x')
              read(iunit) x(1:npart,1)
