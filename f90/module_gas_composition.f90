@@ -46,7 +46,9 @@ module module_gas_composition
   real(kind=8)                :: f_ion           = 0.01                  ! ndust = (n_HI + f_ion*n_HII) * Z/Zsun [Laursen+09]
   real(kind=8)                :: Zref            = 0.005                 ! reference metallicity. Should be ~ 0.005 for SMC and ~ 0.01 for LMC.
   real(kind=8)                :: vturb_kms       = 2d1                   ! Constant turbulent velocity accross the simulation,  in km/s
-  
+  logical                     :: ignoreDust      = .false.               ! if true, no dust in the mix
+                                                 ! (NB: in this case, dust is ignored during RT, but dust properties are still defined)
+    
   ! ! possibility to overwrite ramses values with an ad-hoc model 
   ! logical                  :: gas_overwrite       = .false. ! if true, define cell values from following parameters 
   ! real(kind=8),allocatable :: fix_nscat(:)                  ! ad-hoc HI density (H/cm3)
@@ -238,7 +240,11 @@ contains
        tau_ions(i) = get_tau(cell_gas%number_density(scatterer_ion_index(i)),cell_gas%vth_sq_times_m, cell_gas%vturb, distance_to_border_cm, nu_cell, scatterer_list(i))
        tau_cell = tau_cell + tau_ions(i) 
     end do
-    tau_dust = get_tau_dust(cell_gas%ndust, distance_to_border_cm, nu_cell)
+    if(ignoreDust)then
+       tau_dust = 0.0d0
+    else
+       tau_dust = get_tau_dust(cell_gas%ndust, distance_to_border_cm, nu_cell)
+    endif
     tau_cell = tau_cell + tau_dust
     
 
@@ -349,8 +355,8 @@ contains
        gas_get_tau = gas_get_tau + get_tau(cell_gas%number_density(scatterer_ion_index(i)) ,cell_gas%vth_sq_times_m, cell_gas%vturb, distance_cm, nu_cell, scatterer_list(i))
     end do
 
-    gas_get_tau = gas_get_tau + get_tau_dust(cell_gas%ndust, distance_cm, nu_cell)
-
+    if(.not.(ignoreDust)) gas_get_tau = gas_get_tau + get_tau_dust(cell_gas%ndust, distance_cm, nu_cell)
+    
     return
     
   end function gas_get_tau
@@ -578,6 +584,8 @@ contains
              read(value,*) Zref
           case ('vturb_kms')
              read(value,*) vturb_kms
+          case ('ignoreDust')
+             read(value,*) ignoreDust
           ! case ('gas_overwrite')
           !    read(value,*) gas_overwrite
           ! case ('fix_nscat')
@@ -641,6 +649,7 @@ contains
        write(unit,'(a,ES10.3)') '  f_ion           = ',f_ion
        write(unit,'(a,ES10.3)') '  Zref            = ',Zref
        write(unit,'(a,ES10.3)') '  vturb_kms       = ',vturb_kms
+       write(unit,'(a,L1)')     '  ignoreDust      = ',ignoreDust
        ! write(unit,'(a)')        '# overwrite parameters'
        ! write(unit,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
        ! if(gas_overwrite)then
@@ -672,6 +681,7 @@ contains
        write(*,'(a,ES10.3)') '  f_ion           = ',f_ion
        write(*,'(a,ES10.3)') '  Zref            = ',Zref
        write(*,'(a,ES10.3)') '  vturb_kms       = ',vturb_kms
+       write(*,'(a,L1)')     '  ignoreDust      = ',ignoreDust
        ! write(*,'(a)')        '# overwrite parameters'
        ! write(*,'(a,L1)')     '  gas_overwrite   = ',gas_overwrite
        ! if(gas_overwrite)then
