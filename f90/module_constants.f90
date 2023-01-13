@@ -5,7 +5,7 @@ module module_constants
   ! from the NIST Constant Index
   real(kind=8),parameter :: clight         = 2.99792458d+10          ![cm/s] light speed
   real(kind=8),parameter :: planck         = 6.62607015d-27          ![erg s] Planck's constant
-  real(kind=8),parameter :: kb             = 1.380 649d-16           ![erg/K] Boltzman constant
+  real(kind=8),parameter :: kb             = 1.380649d-16            ![erg/K] Boltzman constant
   real(kind=8),parameter :: mp             = 1.67262192369d-24       ![g] proton mass
   real(kind=8),parameter :: me             = 9.1093837015d-28        ![g] electron 
   real(kind=8),parameter :: amu            = 1.66053906660d-24       ![g] atomic mass unit
