@@ -58,8 +58,7 @@ LDFLAGS     =  -lmpi
 endif
 
 ifeq ($(SYSTYPE),"mac")
-#F90         = gfortran-mp-4.7 -ffree-line-length-none -ffree-form  ###-fopenmp
-F90         = gfortran-mp-8 -ffree-line-length-none -ffree-form  ###-fopenmp
+F90         = gfortran -ffree-line-length-none -ffree-form  ###-fopenmp
 FFLAGS      = -g -fcheck=all -ftrapv -fbacktrace -Wall -fbounds-check
 #FFLAGS      = -O2
 FFLAGS += $(OPTIONS)
@@ -102,7 +101,7 @@ GASOBJS = module_constants.o module_random.o module_utils.o module_voigt.o modul
 
 OBJSDOM = $(GASOBJS) module_select.o module_mesh.o
 
-OBJSPHO = $(GASOBJS) module_mesh.o module_filter.o module_mock.o module_photon.o 
+OBJSPHO = $(GASOBJS) module_mesh.o module_mock.o module_photon.o 
 
 OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
 
@@ -134,11 +133,11 @@ LyaPhotonsFromGas: $(OBJLYAFG)  LyaPhotonsFromGas.o
 CreateDomDump: $(OBJSDOM) CreateDomDump.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) CreateDomDump.o
 
-ExtractSubvol: $(OBJSDOM) ExtractSubvol.o
-	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) ExtractSubvol.o
+#ExtractSubvol: $(OBJSDOM) ExtractSubvol.o
+#	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) ExtractSubvol.o
 
-FescFromStars: $(OBJFESC) FescFromStars.o
-	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJFESC) FescFromStars.o
+#FescFromStars: $(OBJFESC) FescFromStars.o
+#	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJFESC) FescFromStars.o
 
 rascas-serial: $(OBJSPHO) rascas-serial.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) rascas-serial.o
