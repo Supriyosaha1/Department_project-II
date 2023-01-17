@@ -32,7 +32,7 @@ class photonlist(object):
         return nphoton
 
     def get_nu_ic(self):
-        # read photn IC file
+        # read photon IC file
         f = ff(self.icFile) 
         [nphoton]  = f.read_ints()
         [nRealPhotons] = f.read_reals('d')
@@ -69,7 +69,6 @@ class photonlist(object):
         self.vz_ic = xx[:,2]
         f.close()
 
-                
     def load_res(self): 
         # read results from RASCAS
         if self.bakFile is not None:

@@ -1,7 +1,8 @@
 #############################################################################
 # Fortran compiler options and directives
 
-SYSTYPE="CCF"
+SYSTYPE="Cascade"
+#SYSTYPE="CCF"
 #SYSTYPE="lyocral"
 #SYSTYPE="lyocralP"
 #SYSTYPE="mac"
@@ -9,9 +10,25 @@ SYSTYPE="CCF"
 #SYSTYPE="ccage"
 #SYSTYPE="horizon"
 
-OPTIONS = -cpp -fopenmp
+OPTIONS = -cpp # -fopenmp
 OPTIONS += -DDISPLAY_PROGRESS_PERCENT
 
+
+ifeq ($(SYSTYPE),"Cascade")
+F90      = mpif90  -ffree-line-length-none -ffree-form -fallow-argument-mismatch
+#FFLAGS  =  -g -fcheck=all -ftrapv -fbounds-check -fbacktrace
+FFLAGS   = -O3
+FFLAGS  += $(OPTIONS)
+LDFLAGS  = -lmpi
+endif
+
+ifeq ($(SYSTYPE),"PSMN")
+F90         = mpif90
+#FFLAGS      = -g -check all -traceback
+FFLAGS      = -O3 -fpp -ftz -ipo -fno-alias -fno-fnalias -no-prec-div -no-prec-sqrt -align all
+FFLAGS += $(OPTIONS)
+LDFLAGS     = -lmpi
+endif
 
 ifeq ($(SYSTYPE),"lyocral")
 F90         = ifort
@@ -41,8 +58,7 @@ LDFLAGS     =  -lmpi
 endif
 
 ifeq ($(SYSTYPE),"mac")
-#F90         = gfortran-mp-4.7 -ffree-line-length-none -ffree-form  ###-fopenmp
-F90         = gfortran-mp-8 -ffree-line-length-none -ffree-form  ###-fopenmp
+F90         = gfortran -ffree-line-length-none -ffree-form  ###-fopenmp
 FFLAGS      = -g -fcheck=all -ftrapv -fbacktrace -Wall -fbounds-check
 #FFLAGS      = -O2
 FFLAGS += $(OPTIONS)
@@ -51,8 +67,8 @@ endif
 
 
 ifeq ($(SYSTYPE),"macP")
-F90         = mpif90-openmpi-gcc8
-FFLAGS      = -g -fcheck=all -ffree-line-length-none -ffree-form -ftrapv -fbounds-check -fbacktrace -Wall
+F90         = mpif90 #-openmpi-gcc8
+FFLAGS      = -g -ffree-line-length-none -fbounds-check -fbacktrace -fcheck=all -Wall -ftrapv -ffree-form
 #FFLAGS      = -O3
 FFLAGS += $(OPTIONS)
 LDFLAGS     = #-lmpi
@@ -78,36 +94,8 @@ endif
 
 #############################################################################
 # All objects
+COMPOBJS = module_dust_model.o module_scatterer_model.o module_gas_composition.o
 
-# choose the gas mix you want to use
-# 1/ HI, D, and dust
-COMPOBJS = module_dust_model.o module_D_1215_model.o module_HI_1216_model.o module_gas_composition_HI_D_dust.o
-# 2/ HI and dust
-#COMPOBJS = module_dust_model.o module_HI_1216_model.o module_gas_composition_HI_dust.o
-# 3/ pure HI
-#COMPOBJS = module_HI_1216_model.o module_gas_composition_HI.o
-# 4/ pure RAMSES hydro variables
-#COMPOBJS = module_gas_composition_ramses.o
-# 5/ SiII 1190/1193
-#COMPOBJS = module_SiII_1190_model.o module_SiII_1193_model.o module_gas_composition_SiII_1190_1193.o
-# 6/ SiII 1190/1193 and dust
-#COMPOBJS = module_dust_model.o module_SiII_1190_model.o module_SiII_1193_model.o module_gas_composition_SiII_1190_1193_dust.o
-# 7/ MgII
-#COMPOBJS = module_MgII_2796_model.o module_MgII_2804_model.o module_gas_composition_MgII.o
-# 8/ MgII and dust
-#COMPOBJS = module_dust_model.o module_MgII_2796_model.o module_MgII_2804_model.o module_gas_composition_MgII_dust.o
-# 9/ FeII UV1
-#COMPOBJS = module_FeII_2587_model.o module_FeII_2600_model.o module_gas_composition_FeII_UV1.o
-# 10/ FeII UV1 and dust
-#COMPOBJS = module_dust_model.o module_FeII_2587_model.o module_FeII_2600_model.o module_gas_composition_FeII_UV1_dust.o
-# 11/ SiII 1260
-#COMPOBJS = module_SiII_1260_model.o module_gas_composition_SiII_1260.o
-# 12/ SiII 1260 and dust
-#COMPOBJS = module_dust_model.o module_SiII_1260_model.o module_gas_composition_SiII_1260_dust.o
-# 13/ pure dust
-#COMPOBJS = module_dust_model.o module_gas_composition_dust.o
-# 14/ HI, HeI, HeII -> WARNING, this is for fesc measurements only ! 
-#COMPOBJS = module_gas_composition_HI_HeI_HeII.o
 
 GASOBJS = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o $(COMPOBJS)
 
@@ -117,7 +105,7 @@ OBJSPHO = $(GASOBJS) module_mesh.o module_mock.o module_photon.o
 
 OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
 
-OBJLYAFG = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o module_HI_1216_model.o
+OBJLYAFG = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o
 
 OBJFESC	= $(GASOBJS) module_mesh.o module_gray_ray.o
 
@@ -131,7 +119,7 @@ OBJFESC	= $(GASOBJS) module_mesh.o module_gray_ray.o
 	$(F90) $(FFLAGS) -c $^ -o $@
 
 #############################################################################
-all: clean CreateDomDump PhotonsFromSourceModel PhotonsFromStars rascas-serial
+all: clean CreateDomDump PhotonsFromSourceModel PhotonsFromStars LyaPhotonsFromGas rascas
 
 PhotonsFromSourceModel: $(OBJSPHO) module_ssp_lib.o PhotonsFromSourceModel.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) module_ssp_lib.o PhotonsFromSourceModel.o
@@ -145,11 +133,11 @@ LyaPhotonsFromGas: $(OBJLYAFG)  LyaPhotonsFromGas.o
 CreateDomDump: $(OBJSDOM) CreateDomDump.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) CreateDomDump.o
 
-ExtractSubvol: $(OBJSDOM) ExtractSubvol.o
-	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) ExtractSubvol.o
+#ExtractSubvol: $(OBJSDOM) ExtractSubvol.o
+#	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) ExtractSubvol.o
 
-FescFromStars: $(OBJFESC) FescFromStars.o
-	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJFESC) FescFromStars.o
+#FescFromStars: $(OBJFESC) FescFromStars.o
+#	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJFESC) FescFromStars.o
 
 rascas-serial: $(OBJSPHO) rascas-serial.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) rascas-serial.o

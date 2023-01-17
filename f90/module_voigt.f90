@@ -196,21 +196,20 @@ contains
           end do
        end if
        close(10)
+       ! encode approximation choice into an integer
+       select case(trim(approximation))
+       case('Tasitsiomi')
+          approxKey = 1
+       case('COLT')
+          approxKey = 2
+       case('Humlicek_w4')
+          approxKey = 3
+       case default
+          print*,'ERROR: approximation not known in module_voigt.f90: read_voigt_params: ',trim(approximation)
+          stop
+       end select
     endif
     isRead = .True.
-
-    ! encode approximation choice into an integer
-    select case(trim(approximation))
-    case('Tasitsiomi')
-       approxKey = 1
-    case('COLT')
-       approxKey = 2
-    case('Humlicek_w4')
-       approxKey = 3
-    case default
-       print*,'ERROR: approximation not known in module_voigt.f90: read_voigt_params: ',trim(approximation)
-       stop
-    end select
 
     return
   end subroutine read_voigt_params
@@ -227,12 +226,12 @@ contains
           !write(unit,'(a)') ''
           write(unit,'(a,a,a)')    '[voigt]'
           write(unit,'(a,a)')      '  approximation = ',approximation
-          !write(unit,'(a)') ''
+          write(unit,'(a)') ''
        else
           !write(*,*) ''
           write(*,'(a,a,a)')    '[voigt]'
           write(*,'(a,a)')      '  approximation = ',approximation
-          !write(*,*) ''
+          write(*,*) ''
        end if
     end if
     isPrinted = .True.

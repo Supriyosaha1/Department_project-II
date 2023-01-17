@@ -1,0 +1,9 @@
+! D - 1215.34 line
+! Parameters taken from https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+
+m_ion     = 2.014d0
+name_ion  = DI
+lambda_cm = 1215.34d-8                   
+A         = 6.265d8                               
+f         = 0.416d0                 
+n_fluo    = 0

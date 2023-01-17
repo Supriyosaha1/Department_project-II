@@ -20,7 +20,9 @@ module module_dust_model
   real(kind=8)  :: g_dust     = 0.73    ! g parameter of the Henyey-Greenstein phase function for dust scattering [default 0.73 from Li & Draine 2001]
   character(20) :: dust_model = 'SMC' 
   ! --------------------------------------------------------------------------
-  
+
+  integer(kind=4) :: dustKey
+
   public :: get_tau_dust, scatter_dust, read_dust_params, print_dust_params
   private :: sigma_d
   !--PEEL--
@@ -47,7 +49,7 @@ contains
     real(kind=8)            :: get_tau_dust,lbda_A
     
     lbda_A = clight/nu*1d8
-    get_tau_dust = sigma_d(lbda_A,dust_model) * ndust * distance
+    get_tau_dust = sigma_d(lbda_A) * ndust * distance
     
     return
 
@@ -186,6 +188,17 @@ contains
     end if
     close(10)
 
+    ! encode model choice into an integer
+    select case(trim(dust_model))
+    case('SMC')
+       dustKey = 1
+    case('LMC')
+       dustKey = 2
+    case default
+       print*,'ERROR: dust model not known in module_dust.f90: read_dust_params: ',trim(dust_model)
+       stop
+    end select
+    
     return
 
   end subroutine read_dust_params
@@ -218,7 +231,7 @@ contains
   end subroutine print_dust_params
 
   
-  function sigma_d(lbda,model)
+  function sigma_d(lbda)
 
     ! returns the effective cross section of dust (per H atom), in cgs, at wavelength lbda (in A),
     ! for a given model. NB: this is the total cross section (including abs. and scat. probs). 
@@ -227,7 +240,6 @@ contains
     implicit none 
 
     real(kind=8),intent(in)  :: lbda
-    character(20),intent(in) :: model
     real(kind=8)             :: sigma_d,x
     integer(kind=4)          :: i
     ! SMC parameters
@@ -246,21 +258,21 @@ contains
     real(kind=8),parameter              :: lmc_sig0 = 3.0d-22  ! [cm^-2]
 
     sigma_d = 0.0d0
-    select case(trim(model))
-    case('SMC')
+    select case(dustKey)
+    case(1)   ! 'SMC'
        do i = 1,7
           x = lbda / smc_lbda(i)
           sigma_d = sigma_d + smc_a(i) / (x**smc_p(i) + x**(-smc_q(i)) + smc_b(i))
        end do
        sigma_d = sigma_d * smc_sig0
-    case('LMC')
+    case(2)   ! 'LMC'
        do i = 1,7
           x = lbda / lmc_lbda(i)
           sigma_d = sigma_d + lmc_a(i) / (x**lmc_p(i) + x**(-lmc_q(i)) + lmc_b(i))
        end do
        sigma_d = sigma_d * lmc_sig0
     case default
-       print*,'dust model unknown',trim(model)
+       print*,'dust model unknown: ',dustKey,trim(dust_model)
        stop
     end select
 

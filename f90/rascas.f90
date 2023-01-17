@@ -185,7 +185,9 @@ contains
        write(unit,'(a,i8)')          '  nbundle        = ',nbundle
        write(unit,'(a,L1)')          '  verbose        = ',verbose
        write(unit,'(a)')             ' '
+       !--PEEL--
        if (peeling_off) call print_mock_params(unit)
+       !--LEEP--
        call print_master_params(unit)
        write(unit,'(a)')             ' '
        call print_worker_params(unit)
@@ -199,7 +201,9 @@ contains
        write(*,'(a,i8)')          '  nbundle        = ',nbundle
        write(*,'(a,L1)')          '  verbose        = ',verbose
        write(*,'(a)')             ' '       
+       !--PEEL--
        if (peeling_off) call print_mock_params
+       !--LEEP--
        call print_master_params
        write(*,'(a)')             ' '
        call print_worker_params

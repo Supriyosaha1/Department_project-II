@@ -446,7 +446,7 @@ contains
        cell_fully_in_domain = domain_fully_contains_cell(pcell,cell_size,domaine_calcul)
        
        ! compute distance of photon to border of cell along propagation direction
-       distance_to_border           = path(ppos_cell,kobs)                   ! in cell units
+       distance_to_border           = path(ppos_cell,kobs)                  ! in cell units
        distance_to_border_cm        = distance_to_border * cell_size_cm     ! cm
        distance_to_border_box_units = distance_to_border * cell_size        ! in box units
        ! if cell not fully in domain, modify distance_to_border to "distance_to_domain_border" if relevant
@@ -501,30 +501,14 @@ contains
              if (ppos(i) > 1.0d0) ppos(i)=ppos(i)-1.0d0
           enddo
           call whereIsPhotonGoing(domesh,icell,ppos,icellnew,flagoutvol)
-          if (npush == 10) then
-             print*,'npush == 10 ... using les grands moyens ... '
-             ppos(1) = ppos(1) + kobs(1)*(1000.*epsilon(ppos(1)))
-             ppos(2) = ppos(2) + kobs(2)*(1000.*epsilon(ppos(2)))
-             ppos(3) = ppos(3) + kobs(3)*(1000.*epsilon(ppos(3)))
-          end if
-          if (npush == 11) then
-             print*,'npush == 11 ... using les very grands moyens ... '
-             ppos(1) = ppos(1) + kobs(1)*(1e5*epsilon(ppos(1)))
-             ppos(2) = ppos(2) + kobs(2)*(1e5*epsilon(ppos(2)))
-             ppos(3) = ppos(3) + kobs(3)*(1e5*epsilon(ppos(3)))
-          end if
-          if (npush > 11) then
-             print*,'oh well ...'
-             stop
-          end if
        end do
-       if (npush > 1) print*,'WARNING : npush > 1 needed in module_photon:propagate.'
+       if (npush > 1) print*,'WARNING : npush > 1 needed in module_photon:tau_to_border.'
        ! test whether photon was pushed out of domain with the extra pushes
        ! (and in that case, call it done). 
        if (npush > 0) then 
           in_domain = domain_contains_point(ppos,domaine_calcul)
           if (.not. in_domain) then
-             print*,'WARNING: pushed photon outside domain ... '
+             print*,'WARNING: pushed peel outside domain ... '
              exit photon_propagation
           end if
        end if

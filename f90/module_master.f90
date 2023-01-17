@@ -657,7 +657,7 @@ contains
        write(*,'(a,L1)')          '  restart        = ',restart
        write(*,'(a,a)')           '  PhotonBakFile  = ',trim(PhotonBakFile)
        write(*,'(a,f12.3)')       '  dt_backup      = ',dt_backup
-       write(*,'(a)')             ' '       
+       write(*,'(a)')             ' '
        call print_mesh_params
     end if
 
