@@ -1314,19 +1314,19 @@ module module_mesh
       integer(kind=4),intent(in)           :: level
       integer(kind=4),intent(in)           :: lmax
       logical                              :: refine
-      real(kind=8)                         :: rho,rho2,vnorm,vnorm2,delta_d,delta_v,vth
+      real(kind=8)                         :: rho,rho2,vnorm,vnorm2,delta_d,delta_v,dopvel
       real(kind=8),dimension(3)            :: xx,vel,vel2
       integer(kind=4)                      :: np
       integer(kind=4)                      :: ic,jc,kc,ifirst,jfirst,kfirst,itest,jtest,ktest,i,j,k,ltest
       real(kind=8)                         :: floor_d,floor_v
-      real(kind=8)                         :: dx,rhomin,rhomax,vmin,vmax
+      real(kind=8)                         :: dx,rhomin,rhomax,vmin,vmax,dopvel_min
       
       floor_d = 1.d-10
       floor_v = 1.d-10
       
       ! call im_get_props(x,rho,vel)
-      vel(:) = idealised_model_get_velocity(x(1),x(2),x(3))
-      rho = idealised_model_get_scatterer_density(x(1),x(2),x(3))
+      vel(:) = idealised_model_get_velocity(x)
+      rho = idealised_model_get_scatterer_density(x)
       
       vnorm=sqrt(vel(1)**2+vel(2)**2+vel(3)**2)
       ! JB- refine on momentum to avoid refining in voids (where the v-field is defined but the density is zero).
@@ -1339,12 +1339,11 @@ module module_mesh
       end if
       rhomin = rho
       rhomax = rho
+      ! get doppler velocity dopvel = sqrt(vth^2 + vturb^2)
       !call im_get_vth(vth) ! i put this here but if vth was a function of position it should be somewhere below... 
-      vth = idealised_model_get_turbulent_velocity(x(1),x(2),x(3))
-      ! Leo: - idealised_model_get_turbulent_velocity or gas_get_min_dopvel(x,y,z) ?
-      !      - And vth(this_x) or vth(x_below)?
-      ! -JB
-
+      dopvel = gas_get_dopvel(x)
+      dopvel_min = dopvel
+      
       refine=.false.
       ltest=level
       
@@ -1374,8 +1373,10 @@ module module_mesh
                   xx(2)=(jtest-0.5)*dx
                   xx(3)=(ktest-0.5)*dx
                   !call im_get_props(xx,rho2,vel2)
-                  vel2(:) = idealised_model_get_velocity(xx(1),xx(2),xx(3))
-                  rho2 = idealised_model_get_scatterer_density(xx(1),xx(2),xx(3))
+                  vel2(:) = idealised_model_get_velocity(xx)
+                  rho2 = idealised_model_get_scatterer_density(xx)
+                  ! recompute vth local here
+                  ! and take the min
                   if (rho2 > rhomax) rhomax = rho2
                   if (rho2 < rhomin) rhomin = rho2
                   ! RAMSES formulation
@@ -1388,7 +1389,11 @@ module module_mesh
                      if (vnorm2 > vmax) vmax = vnorm2
                      if (vnorm2 < vmin) vmin = vnorm2
                      delta_v = (vmax-vmin)
-                     if (refine_dv_over_vth)   refine = refine .or. delta_v>vth
+                     if (refine_dv_over_vth)then
+                        dopvel = gas_get_dopvel(xx)
+                        dopvel_min = min(dopvel,dopvel_min)
+                        refine = refine .or. delta_v>dopvel_min
+                     endif
                      delta_v = delta_v / (vmax+vmin+floor_v)
                      if (refine_err_grad_v>=0) refine = refine .or. delta_v>refine_err_grad_v
                   endif
