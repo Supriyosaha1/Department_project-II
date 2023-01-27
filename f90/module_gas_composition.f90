@@ -5,7 +5,8 @@ module module_gas_composition
   use module_scatterer_model
   use module_dust_model
   use module_random
-  use module_constants
+  use module_constants, only: kb, amu
+  use module_idealised_model
 
   implicit none
 
@@ -64,6 +65,8 @@ module module_gas_composition
   public :: gas_from_ramses_leaves,get_gas_velocity,gas_get_scatter_flag,gas_scatter,dump_gas
   public :: read_gas,gas_destructor,read_gas_composition_params,print_gas_composition_params
   public :: get_metal_ion_names
+
+  public :: gas_from_idealised_model, gas_get_dopvel
 
   !--PEEL--
   public :: gas_peeloff_weight,gas_get_tau
@@ -166,6 +169,91 @@ contains
   end subroutine gas_from_ramses_leaves
 
 
+
+  subroutine gas_from_idealised_model(nleaf, g, x_leaf, leaf_level)
+    ! work only for one ion/element
+    
+    integer(kind=4),intent(in)                       :: nleaf
+    type(gas),dimension(:),allocatable,intent(out)   :: g
+    real(kind=8),intent(in),dimension(nleaf,3)       :: x_leaf
+    integer(kind=4),intent(in),dimension(nleaf)      :: leaf_level ! not useful anymore (was useful for MC sampling of cell properties), kept in for now...
+    integer(kind=4)                                  :: ileaf
+    real(kind=8)                                     :: T
+    
+    ! allocate gas-element array
+    allocate(g(nleaf))
+
+    ! Allocate the density variable
+    ! work only for one ion/element
+    if(element_number /= 1)then
+       print*,'idealised model works only for one element/ion, check the config file...'
+       stop
+    endif
+    do ileaf=1,nleaf
+       allocate(g(ileaf)%number_density(element_number))
+    end do
+    
+    box_size_cm = idealised_model_box_size_cm
+
+    ! get gas velocity
+    do ileaf = 1, nleaf
+       g(ileaf)%v(:) = idealised_model_get_velocity(x_leaf(ileaf,1:3))
+    end do
+
+    ! get density of scatterer
+    do ileaf = 1,nleaf
+       g(ileaf)%number_density(1) = idealised_model_get_scatterer_density(x_leaf(ileaf,1:3))
+    end do
+
+    ! get temperature
+    do ileaf = 1,nleaf
+       T = idealised_model_get_temperature(x_leaf(ileaf,1:3))
+       g(ileaf)%vth_sq_times_m = 2 * kb * T / amu
+    end do
+    ! get vturb
+    do ileaf = 1,nleaf
+       g(ileaf)%vturb = idealised_model_get_turbulent_velocity(x_leaf(ileaf,1:3))
+    end do
+    ! get ndust
+    do ileaf = 1,nleaf
+       g(ileaf)%ndust = idealised_model_get_dust_density(x_leaf(ileaf,1:3))
+    end do
+
+    return
+  end subroutine gas_from_idealised_model
+
+
+  !function gas_get_min_dopvel(x)
+  !  implicit none
+  !  real(kind=8),dimension(3),intent(in) :: x
+  !  real(kind=8) :: T,vth,vth_sq_times_m,vturb,vmin
+  !  real(kind=8) ::gas_get_min_dopvel
+  !  integer(kind=4) :: i
+  !  T = idealised_model_get_temperature(x)
+  !  vth_sq_times_m = 2 * kb * T / amu
+  !  vturb = idealised_model_get_turbulent_velocity(x)
+  !  vmin = 1d20
+  !  do i = 1, nscatterer
+  !     vmin = min(vmin,vth_sq_times_m/scatterer_list(i)%m_ion)
+  !  end do
+  !  gas_get_min_dopvel = sqrt(vmin + vturb*vturb)
+  !  return
+  !end function gas_get_min_dopvel
+
+
+  function gas_get_dopvel(x)
+    ! only for idealised_model with only one element/ion!
+    implicit none
+    real(kind=8),dimension(3),intent(in) :: x
+    real(kind=8)                         :: T,vth_sq_times_m,vturb
+    real(kind=8)                         ::gas_get_dopvel
+    T = idealised_model_get_temperature(x)
+    vth_sq_times_m = 2 * kb * T / amu
+    vturb = idealised_model_get_turbulent_velocity(x)
+    gas_get_dopvel = sqrt(vth_sq_times_m/scatterer_list(1)%m_ion + vturb*vturb)
+    return
+  end function gas_get_dopvel
+  
   
   ! subroutine overwrite_gas(g)
   !   ! overwrite ramses values with an ad-hoc model
