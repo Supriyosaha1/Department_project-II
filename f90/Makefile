@@ -94,7 +94,7 @@ endif
 
 #############################################################################
 # All objects
-COMPOBJS = module_dust_model.o module_scatterer_model.o module_gas_composition.o
+COMPOBJS = module_dust_model.o module_scatterer_model.o module_idealised_model.o module_gas_composition.o
 
 
 GASOBJS = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o $(COMPOBJS)
@@ -132,6 +132,9 @@ LyaPhotonsFromGas: $(OBJLYAFG)  LyaPhotonsFromGas.o
 
 CreateDomDump: $(OBJSDOM) CreateDomDump.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) CreateDomDump.o
+
+CreateDomDumpAMRModel: $(OBJSDOM) CreateDomDumpAMRModel.o
+	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) CreateDomDumpAMRModel.o
 
 #ExtractSubvol: $(OBJSDOM) ExtractSubvol.o
 #	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) ExtractSubvol.o
