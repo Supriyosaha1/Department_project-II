@@ -179,6 +179,7 @@ contains
     integer(kind=4),intent(in),dimension(nleaf)      :: leaf_level ! not useful anymore (was useful for MC sampling of cell properties), kept in for now...
     integer(kind=4)                                  :: ileaf
     real(kind=8)                                     :: T
+    real(kind=8),dimension(3)                        :: xtmp
     
     ! allocate gas-element array
     allocate(g(nleaf))
@@ -186,6 +187,7 @@ contains
     ! Allocate the density variable
     ! work only for one ion/element
     if(element_number /= 1)then
+       print*,'element_number =',element_number
        print*,'idealised model works only for one element/ion, check the config file...'
        stop
     endif
@@ -195,28 +197,19 @@ contains
     
     box_size_cm = idealised_model_box_size_cm
 
-    ! get gas velocity
     do ileaf = 1, nleaf
-       g(ileaf)%v(:) = idealised_model_get_velocity(x_leaf(ileaf,1:3))
-    end do
-
-    ! get density of scatterer
-    do ileaf = 1,nleaf
-       g(ileaf)%number_density(1) = idealised_model_get_scatterer_density(x_leaf(ileaf,1:3))
-    end do
-
-    ! get temperature
-    do ileaf = 1,nleaf
-       T = idealised_model_get_temperature(x_leaf(ileaf,1:3))
+       xtmp(1:3) = x_leaf(ileaf,1:3)
+       ! get gas velocity
+       g(ileaf)%v(:) = idealised_model_get_velocity(xtmp)
+       ! get density of scatterer
+       g(ileaf)%number_density(1) = idealised_model_get_scatterer_density(xtmp)
+       ! get temperature
+       T = idealised_model_get_temperature(xtmp)
        g(ileaf)%vth_sq_times_m = 2 * kb * T / amu
-    end do
-    ! get vturb
-    do ileaf = 1,nleaf
-       g(ileaf)%vturb = idealised_model_get_turbulent_velocity(x_leaf(ileaf,1:3))
-    end do
-    ! get ndust
-    do ileaf = 1,nleaf
-       g(ileaf)%ndust = idealised_model_get_dust_density(x_leaf(ileaf,1:3))
+       ! get vturb
+       g(ileaf)%vturb = idealised_model_get_turbulent_velocity(xtmp)
+       ! get ndust
+       g(ileaf)%ndust = idealised_model_get_dust_density(xtmp)
     end do
 
     return
