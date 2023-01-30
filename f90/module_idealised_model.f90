@@ -11,7 +11,7 @@ module module_idealised_model
   ! custom parameters read from configuration file 
   real(kind=8) :: ColumnDensity_cgs     ! column density from center to edge of sphere [cm^-2]
   real(kind=8) :: Radius_cgs            ! radius of sphere [cm]
-  real(kind=8) :: Temperature           ! gas temperatyre [K]
+  real(kind=8) :: Temperature           ! gas temperature [K]
   real(kind=8) :: TurbulentVelocity_kms ! velocity dispersion (sigma) due to turbulent velocity [km/s]
   
   ! mandatory parameters 
@@ -157,17 +157,19 @@ contains
     implicit none
     integer(kind=4),optional,intent(in)  :: unit
     if (present(unit)) then
-       write(unit,'(a,a)')   '  ColumnDensity_cgs     = ',ColumnDensity_cgs
-       write(unit,'(a,a)')   '  Radius_cgs            = ',Radius_cgs
-       write(unit,'(a,a)')   '  Temperature           = ',Temperature
-       write(unit,'(a,a)')   '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
-       write(unit,'(a,a)')   '  box_size_cm           = ',idealised_model_box_size_cm
+       write(unit,'(a,a,a)')     '[IdealisedModel]'
+       write(unit,'(a,ES13.6)')  '  ColumnDensity_cgs     = ',ColumnDensity_cgs
+       write(unit,'(a,ES13.6)')  '  Radius_cgs            = ',Radius_cgs
+       write(unit,'(a,ES13.6)')  '  Temperature           = ',Temperature
+       write(unit,'(a,ES13.6)')  '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
+       write(unit,'(a,ES13.6)')  '  box_size_cm           = ',idealised_model_box_size_cm
     else
-       write(*,'(a,a)')      '  ColumnDensity_cgs     = ',ColumnDensity_cgs
-       write(*,'(a,a)')      '  Radius_cgs            = ',Radius_cgs
-       write(*,'(a,a)')      '  Temperature           = ',Temperature
-       write(*,'(a,a)')      '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
-       write(*,'(a,a)')      '  box_size_cm           = ',idealised_model_box_size_cm
+       write(*,'(a,a,a)')        '[IdealisedModel]'
+       write(*,'(a,ES13.6)')     '  ColumnDensity_cgs     = ',ColumnDensity_cgs
+       write(*,'(a,ES13.6)')     '  Radius_cgs            = ',Radius_cgs
+       write(*,'(a,ES13.6)')     '  Temperature           = ',Temperature
+       write(*,'(a,ES13.6)')     '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
+       write(*,'(a,ES13.6)')     '  box_size_cm           = ',idealised_model_box_size_cm
     end if
   end subroutine idealised_model_print_params
 
