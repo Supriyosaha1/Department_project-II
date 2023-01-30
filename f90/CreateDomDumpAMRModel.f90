@@ -3,7 +3,7 @@ program CreateDomDumpAMRModel
   use module_domain
   use module_ramses
   use module_mesh
-  !use module_gas_composition
+  use module_gas_composition
   !use module_select
   use module_idealised_model
 
@@ -73,6 +73,14 @@ program CreateDomDumpAMRModel
   if (verbose) call print_CreateDomDump_params
   ! ------------------------------------------------------------
 
+  ! idealised model works only for one ion/element
+  if(element_number /= 1)then
+     print*,'element_number =',element_number
+     print*,'idealised model works only for one element/ion, check the config file...'
+     stop
+  endif
+
+  
   ! Define the computational domain. This domain describes the volume in which photons fly.
   select case(comput_dom_type)
   case('sphere')
