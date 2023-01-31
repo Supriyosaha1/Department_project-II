@@ -51,7 +51,7 @@ contains
     real(kind=8)  :: idealised_model_get_scatterer_density
     real(kind=8) :: d
 
-    d = x(1)*x(1) + x(2)*x(2) + x(3)*x(3)
+    d = (x(1)-0.5d0)*(x(1)-0.5d0) + (x(2)-0.5d0)*(x(2)-0.5d0) + (x(3)-0.5d0)*(x(3)-0.5d0)
     if (d < Radius_squared_box_units) then 
        idealised_model_get_scatterer_density = ColumnDensity_cgs / Radius_cgs ! [cm^-3]
     else
