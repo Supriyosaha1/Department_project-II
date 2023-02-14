@@ -26,9 +26,6 @@ module module_idealised_model
   public :: idealised_model_read_params,idealised_model_print_params
   
 contains
-
-
-  ! Leo: better to use vector x
   
   function idealised_model_get_velocity(x)
     ! return bulk velocity of gas at position x
@@ -143,7 +140,7 @@ contains
     end if
     close(10)
     
-    ! make sure to define mandatory parameter idealised_model_box_size_cm
+    ! make sure to define mandatory parameter idealised_model_box_size_cm 
     idealised_model_box_size_cm = 2.0d0 * Radius_cgs
 
     ! compute useful parameters 

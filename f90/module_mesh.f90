@@ -1321,12 +1321,12 @@ module module_mesh
       real(kind=8)                         :: floor_d,floor_v
       real(kind=8)                         :: dx,rhomin,rhomax,vmin,vmax,dopvel_min
       
-      floor_d = 1.d-10
-      floor_v = 1.d-10
+      floor_d = 1.d-30
+      floor_v = 1.d-30
       
       ! call im_get_props(x,rho,vel)
       vel(:) = idealised_model_get_velocity(x)
-      rho = idealised_model_get_scatterer_density(x)
+      rho    = idealised_model_get_scatterer_density(x)
       
       vnorm=sqrt(vel(1)**2+vel(2)**2+vel(3)**2)
       ! JB- refine on momentum to avoid refining in voids (where the v-field is defined but the density is zero).
@@ -1382,7 +1382,7 @@ module module_mesh
                   ! RAMSES formulation
                   if(refine_err_grad_d>=0.) then
                      delta_d = (rhomax-rhomin)/(rhomax+rhomin+floor_d)    !! JB - delta_d -> 1 when rho>>rho2 or rho2>>rho... 
-                     refine = refine .or. delta_d>refine_err_grad_d
+                     refine = refine .or. delta_d>=refine_err_grad_d
                   endif
                   if( (refine_err_grad_v>=0. .or. refine_dv_over_vth) .and. rho2 > 0.0d0 )then  ! JB: only test if there is gas 
                      vnorm2=sqrt(vel2(1)**2+vel2(2)**2+vel2(3)**2)

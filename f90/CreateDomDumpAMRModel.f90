@@ -353,6 +353,17 @@ contains
     
     call read_mesh_params(pfile)
     if (idealised_models) then
+       ! JB- 
+       ! force data domain to cover full box for idealised models. 
+       decomp_dom_type    = 'cube'
+       decomp_dom_ndomain = 1
+       allocate(decomp_dom_size(1))
+       decomp_dom_size(1) = 1.0d0
+       if (.not. allocated(decomp_dom_xc)) allocate(decomp_dom_xc(1),decomp_dom_yc(1),decomp_dom_zc(1))
+       decomp_dom_xc(1) = 0.5d0     
+       decomp_dom_yc(1) = 0.5d0
+       decomp_dom_zc(1) = 0.5d0
+       ! -JB
        call idealised_model_read_params(pfile)
     else
        call read_ramses_params(pfile)
