@@ -3,12 +3,14 @@
 
 # Compiler flavor: GNU or INTEL
 COMPILER = GNU
+# compiler name
+F90 = gfortran
 # Do we want a debug build? 1=Yes, 0=No
 DEBUG = 0
 # Use of OpenMP? 1=Yes, 0=No
 OPENMP = 1
-# compiler name
-F90 = gfortran
+# Use of MPI? 1=Yes, 0=No
+MPI=1
 
 # MacOSX with strange path to internal libraries
 MACOS11 = 0
@@ -71,7 +73,11 @@ OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
 	$(F90) $(FFLAGS) -c $^ -o $@
 
 #############################################################################
+ifeq ($(MPI),1)
 all: clean CreateDomDumpAMRModel PhotonsFromSourceModel rascas rascas-serial
+else
+all: clean CreateDomDumpAMRModel PhotonsFromSourceModel rascas-serial
+endif
 
 PhotonsFromSourceModel: $(OBJSPHO) PhotonsFromSourceModel.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) PhotonsFromSourceModel.o
