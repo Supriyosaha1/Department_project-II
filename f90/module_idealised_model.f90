@@ -10,20 +10,21 @@ module module_idealised_model
 
   ! custom parameters read from configuration file 
   real(kind=8) :: ColumnDensity_cgs     ! column density from center to edge of sphere [cm^-2]
-  real(kind=8) :: Radius_cgs            ! radius of sphere [cm]
+  real(kind=8) :: idealised_model_box_size_cm ! size of the box in cm
+  real(kind=8) :: Radius_boxUnits            ! radius of sphere in box-size units
   real(kind=8) :: Temperature           ! gas temperature [K]
   real(kind=8) :: TurbulentVelocity_kms ! velocity dispersion (sigma) due to turbulent velocity [km/s]
   
-  ! mandatory parameters 
-  real(kind=8),public :: idealised_model_box_size_cm  ! size of computational box [cm]
-
   ! useful derived parameters
+  real(kind=8) :: Radius_cgs ! Radius of sphere in cm
   real(kind=8) :: Radius_squared_box_units ! square of radius of sphere, in units of box size.
   
   ! public functions:
   public :: idealised_model_get_velocity,idealised_model_get_scatterer_density,idealised_model_get_turbulent_velocity
   public :: idealised_model_get_temperature,idealised_model_get_dust_density
   public :: idealised_model_read_params,idealised_model_print_params
+  ! public parameters:
+  public :: idealised_model_box_size_cm
   
 contains
   
@@ -129,8 +130,10 @@ contains
           select case (trim(name))
           case ('ColumnDensity_cgs')
              read(value,*) ColumnDensity_cgs
-          case ('Radius_cgs')
-             read(value,*) Radius_cgs
+          case ('boxsize_cm')
+             read(value,*) idealised_model_box_size_cm
+          case ('Radius_boxUnits')
+             read(value,*) Radius_boxUnits
           case ('Temperature')
              read(value,*) Temperature
           case ('TurbulentVelocity_kms')
@@ -140,11 +143,10 @@ contains
     end if
     close(10)
     
-    ! make sure to define mandatory parameter idealised_model_box_size_cm 
-    idealised_model_box_size_cm = 2.0d0 * Radius_cgs
-
+    ! Convert radius to cgs  
+    Radius_cgs = Radius_boxUnits * idealised_model_box_size_cm
     ! compute useful parameters 
-    Radius_squared_box_units = (Radius_cgs / idealised_model_box_size_cm)**2
+    Radius_squared_box_units = Radius_boxUnits**2
     
     return
   end subroutine idealised_model_read_params
@@ -156,14 +158,16 @@ contains
     if (present(unit)) then
        write(unit,'(a,a,a)')     '[IdealisedModel]'
        write(unit,'(a,ES13.6)')  '  ColumnDensity_cgs     = ',ColumnDensity_cgs
-       write(unit,'(a,ES13.6)')  '  Radius_cgs            = ',Radius_cgs
+       write(unit,'(a,ES13.6)')  '  boxsize_cm            = ',idealised_model_box_size_cm
+       write(unit,'(a,ES13.6)')  '  Radius_boxUnits       = ',Radius_boxUnits
        write(unit,'(a,ES13.6)')  '  Temperature           = ',Temperature
        write(unit,'(a,ES13.6)')  '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
        write(unit,'(a,ES13.6)')  '  box_size_cm           = ',idealised_model_box_size_cm
     else
        write(*,'(a,a,a)')        '[IdealisedModel]'
        write(*,'(a,ES13.6)')     '  ColumnDensity_cgs     = ',ColumnDensity_cgs
-       write(*,'(a,ES13.6)')     '  Radius_cgs            = ',Radius_cgs
+       write(*,'(a,ES13.6)')     '  boxsize_cm            = ',idealised_model_box_size_cm
+       write(*,'(a,ES13.6)')     '  Radius_boxUnits       = ',Radius_boxUnits
        write(*,'(a,ES13.6)')     '  Temperature           = ',Temperature
        write(*,'(a,ES13.6)')     '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
        write(*,'(a,ES13.6)')     '  box_size_cm           = ',idealised_model_box_size_cm
