@@ -4,7 +4,8 @@ module module_idealised_model
 
   ! This model has a H number density defined by n_H(r) = n_H,0 (r_inner/r)^2  [Eq. 2 of Burchett+21]  
   ! The velocity profile is linear in r (increasing or decreasing) from v_inner at r_inner to v_outer at r_outer:
-  !            v(r) = v_in + (r - r_inner)/(r_outer - r_inner) * (v_outer - v_inner)
+  !            v(r) = [v_in + (r - r_inner)/(r_outer - r_inner) * (v_outer - v_inner)] * u_r
+  !  (with u_r the normalised radial vector). 
   ! 
   ! -> 5 independent parameters which we chose to be : n_H,0, r_inner, r_outer, v_inner, v_outer
   
