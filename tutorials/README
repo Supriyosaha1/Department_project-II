@@ -1,0 +1,5 @@
+tutorial_1 : homogeneous sphere
+tutorial_2 : model of Burchett (thick shell with density \propto 1/r^2 and velocity going linearly with radius).
+
+
+tutorial_5 : model of Burchett with cold streams ... (uses mock cubes)
