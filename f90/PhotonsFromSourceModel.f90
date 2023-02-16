@@ -105,7 +105,7 @@ program PhotonsFromSourceModel
 
   
   ! --------------------------------------------------------------------------------------
-  ! make source shines
+  ! make sources shine
   ! --------------------------------------------------------------------------------------
   one = 1.0d0
   allocate(photgrid(nphotons))

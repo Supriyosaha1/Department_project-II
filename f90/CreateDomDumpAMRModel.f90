@@ -1,10 +1,8 @@
 program CreateDomDumpAMRModel
 
   use module_domain
-  use module_ramses
   use module_mesh
   use module_gas_composition
-  !use module_select
   use module_idealised_model
 
   implicit none
@@ -210,7 +208,6 @@ program CreateDomDumpAMRModel
      if (verbose) write(*,*)'Building the mesh from the model...'     
      call mesh_from_model(domain_list(i),domain_mesh,noctmax)
 
-
      fichier = trim(DomDumpDir)//trim(mesh_file_list(i))
      call dump_mesh(domain_mesh, fichier)
      call mesh_destructor(domain_mesh)
@@ -352,23 +349,19 @@ contains
     DomDumpDir = trim(DomDumpDir)//"/"
     
     call read_mesh_params(pfile)
-    if (idealised_models) then
-       ! JB- 
-       ! force data domain to cover full box for idealised models. 
-       decomp_dom_type    = 'cube'
-       decomp_dom_ndomain = 1
-       allocate(decomp_dom_size(1))
-       decomp_dom_size(1) = 1.0d0
-       if (.not. allocated(decomp_dom_xc)) allocate(decomp_dom_xc(1),decomp_dom_yc(1),decomp_dom_zc(1))
-       decomp_dom_xc(1) = 0.5d0     
-       decomp_dom_yc(1) = 0.5d0
-       decomp_dom_zc(1) = 0.5d0
-       ! -JB
-       call idealised_model_read_params(pfile)
-    else
-       call read_ramses_params(pfile)
-    endif
-    
+    ! JB- 
+    ! force data domain to cover full box for idealised models. 
+    decomp_dom_type    = 'cube'
+    decomp_dom_ndomain = 1
+    allocate(decomp_dom_size(1))
+    decomp_dom_size(1) = 1.0d0
+    if (.not. allocated(decomp_dom_xc)) allocate(decomp_dom_xc(1),decomp_dom_yc(1),decomp_dom_zc(1))
+    decomp_dom_xc(1) = 0.5d0     
+    decomp_dom_yc(1) = 0.5d0
+    decomp_dom_zc(1) = 0.5d0
+    ! -JB
+    call idealised_model_read_params(pfile)
+
     return
 
   end subroutine read_CreateDomDump_params
@@ -428,11 +421,7 @@ contains
        write(unit,'(a,L1)')          ' idealised_models = ',idealised_models
        write(unit,'(a)')             ' '
        call print_mesh_params(unit)
-       if (idealised_models) then
-          call idealised_model_print_params(unit)
-       else
-          call print_ramses_params(unit)
-       endif
+       call idealised_model_print_params(unit)
        else
        write(*,'(a)')             '--------------------------------------------------------------------------------'
        write(*,'(a)')             ' '
@@ -480,11 +469,7 @@ contains
        write(*,'(a)')             ' '
        call print_mesh_params
        write(*,'(a)')             ' '
-       if (idealised_models) then
-          call idealised_model_print_params
-       else
-          call print_ramses_params
-       endif
+       call idealised_model_print_params
        write(*,'(a)')             ' '
        write(*,'(a)')             '--------------------------------------------------------------------------------'
        write(*,'(a)')             ' '

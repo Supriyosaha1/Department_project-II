@@ -171,7 +171,7 @@ contains
 
 
   subroutine gas_from_idealised_model(nleaf, g, x_leaf, leaf_level)
-    ! work only for one ion/element
+    ! works only for one ion/element
     
     integer(kind=4),intent(in)                       :: nleaf
     type(gas),dimension(:),allocatable,intent(out)   :: g
@@ -185,7 +185,7 @@ contains
     allocate(g(nleaf))
 
     ! Allocate the density variable
-    ! work only for one ion/element
+    ! works only for one ion/element
     if(element_number /= 1)then
        print*,'element_number =',element_number
        print*,'idealised model works only for one element/ion, check the config file...'
