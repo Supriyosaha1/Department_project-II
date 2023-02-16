@@ -1,48 +1,68 @@
 #############################################################################
 # Fortran compiler options and directives
 
-#SYSTYPE="mac"
-SYSTYPE="macP"
+# Compiler flavor: GNU or INTEL
+COMPILER = GNU
+# Do we want a debug build? 1=Yes, 0=No
+DEBUG = 0
+# Use of OpenMP? 1=Yes, 0=No
+OPENMP = 1
+# compiler name
+F90 = gfortran
 
-OPTIONS = -cpp # -fopenmp
+# MacOSX with strange path to internal libraries
+MACOS11 = 0
+
+#############################################################################
+OPTIONS = -cpp
 OPTIONS += -DDISPLAY_PROGRESS_PERCENT
-
-
-ifeq ($(SYSTYPE),"mac")
-F90         = gfortran -ffree-line-length-none -ffree-form  ###-fopenmp
-#FFLAGS      = -g -fcheck=all -ftrapv -fbacktrace -Wall -fbounds-check
-FFLAGS      = -O2
-FFLAGS += $(OPTIONS)
-LDFLAGS     = #-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/
+ifeq ($(OPENMP),1)
+	OPTIONS += -fopenmp
 endif
 
-
-ifeq ($(SYSTYPE),"macP")
-F90         = mpif90-openmpi-gcc12 -ffree-line-length-none -ffree-form #mpif90 #-openmpi-gcc8
-#FFLAGS      = -g -ffree-line-length-none -fbounds-check -fbacktrace -fcheck=all -Wall -ftrapv -ffree-form
-FFLAGS      = -O3
-FFLAGS += $(OPTIONS)
-LDFLAGS     = #-lmpi
-LDFLAGS     = #-I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/ #-lmpi
+# GNU compiler (gfortran)
+ifeq ($(COMPILER),GNU)
+   FFLAGS = -ffree-line-length-none -ffree-form
+   LDMPIFLAGS =     #-lmpi
+   ifeq ($(DEBUG),1)
+      FFLAGS += -O0 -fbounds-check -Wuninitialized -Wall -g -ftrapv -fbacktrace -fimplicit-none -fcheck=all
+      #FFLAGS += -ffpe-trap=zero,underflow,overflow,invalid -finit-real=nan
+   else
+      FFLAGS += -O3
+   endif
 endif
 
+# Intel compiler (ifort)
+ifeq ($(COMPILER),INTEL)
+   FFLAGS =
+   LDMPIFLAGS = -lmpi
+   #FFLAGS += -fp-model source
+   ifeq ($(DEBUG),1)
+      FFLAGS += -warn all -O0 -g -traceback -check bounds -check all -debug -ftrapuv -fpp
+      #FFLAGS += -fpe0 -ftrapuv -init=zero -init=snan -init=arrays
+   else
+      FFLAGS += -O3 -fpp -ftz  -xavx -sox -ipo -fno-alias -fno-fnalias -no-prec-div -no-prec-sqrt -align all
+   endif
+endif
 
+FFLAGS += $(OPTIONS)
+
+ifeq ($(MACOS11),1)
+   LDFLAGS += -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/
+endif
 
 #############################################################################
 # All objects
-COMPOBJS = module_dust_model.o module_scatterer_model.o module_idealised_model.o module_gas_composition.o
 
-GASOBJS = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o $(COMPOBJS)
+OBJSBASE = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o
 
-OBJSDOM = $(GASOBJS) module_select.o module_mesh.o
+OBJSGAS = $(OBJSBASE) module_dust_model.o module_scatterer_model.o module_idealised_model.o module_gas_composition.o
 
-OBJSPHO = $(GASOBJS) module_mesh.o module_mock.o module_photon.o 
+OBJSDOM = $(OBJSGAS) module_select.o module_mesh.o
+
+OBJSPHO = $(OBJSGAS) module_ssp_lib.o module_mesh.o module_mock.o module_photon.o 
 
 OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
-
-OBJLYAFG = module_constants.o module_random.o module_utils.o module_voigt.o module_domain.o coolrates_module.o module_ramses.o module_uparallel.o
-
-OBJFESC	= $(GASOBJS) module_mesh.o module_gray_ray.o
 
 
 #############################################################################
@@ -53,8 +73,8 @@ OBJFESC	= $(GASOBJS) module_mesh.o module_gray_ray.o
 #############################################################################
 all: clean CreateDomDumpAMRModel PhotonsFromSourceModel rascas rascas-serial
 
-PhotonsFromSourceModel: $(OBJSPHO) module_ssp_lib.o PhotonsFromSourceModel.o
-	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) module_ssp_lib.o PhotonsFromSourceModel.o
+PhotonsFromSourceModel: $(OBJSPHO) PhotonsFromSourceModel.o
+	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) PhotonsFromSourceModel.o
 
 CreateDomDumpAMRModel: $(OBJSDOM) CreateDomDumpAMRModel.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) CreateDomDumpAMRModel.o
@@ -66,5 +86,5 @@ rascas: $(OBJSMPI) rascas.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSMPI) rascas.o
 
 clean:
-	rm -f $(OBJSDOM) $(OBJSPHO) $(OBJSMPI) *.o *.mod
+	rm -f *.o *.mod
 #############################################################################
