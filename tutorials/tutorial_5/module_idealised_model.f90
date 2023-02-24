@@ -238,9 +238,7 @@ contains
           case ('cold_stream_directions')
              if (nb_of_cold_streams > 0) then
                 allocate(cold_stream_direction(3,nb_of_cold_streams))
-                do istream = 1, nb_of_cold_streams
-                   read(value,*) cold_stream_direction(1:3,istream)
-                end do
+                read(value,*) (cold_stream_direction(1:3,istream),istream = 1, nb_of_cold_streams)
              end if
           end select
        end do
@@ -267,6 +265,7 @@ contains
     ! define derived parameters for cold streams
     cold_stream_solid_angle = 12.56637 * cold_stream_covering_fraction   ! 12.566370 is 4*pi
     cold_stream_min_dotprod = 1.0d0 - cold_stream_solid_angle / 6.28318  ! 6.28318 is 2*pi
+    
     ! make sure directions are normalised vectors
     do istream = 1,nb_of_cold_streams
        norm = cold_stream_direction(1,istream)**2 + cold_stream_direction(2,istream)**2 + cold_stream_direction(3,istream)**2 
