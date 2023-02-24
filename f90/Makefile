@@ -19,13 +19,16 @@ MACOS11 = 0
 OPTIONS = -cpp
 OPTIONS += -DDISPLAY_PROGRESS_PERCENT
 ifeq ($(OPENMP),1)
-	OPTIONS += -fopenmp
+   OPTIONS += -fopenmp
 endif
+
+#ifeq ($(MPI),1)
+#   LDFLAGS = -lmpi
+#endif
 
 # GNU compiler (gfortran)
 ifeq ($(COMPILER),GNU)
    FFLAGS = -ffree-line-length-none -ffree-form
-   LDMPIFLAGS =     #-lmpi
    ifeq ($(DEBUG),1)
       FFLAGS += -O0 -fbounds-check -Wuninitialized -Wall -g -ftrapv -fbacktrace -fimplicit-none -fcheck=all
       #FFLAGS += -ffpe-trap=zero,underflow,overflow,invalid -finit-real=nan
@@ -36,8 +39,6 @@ endif
 
 # Intel compiler (ifort)
 ifeq ($(COMPILER),INTEL)
-   FFLAGS =
-   LDMPIFLAGS = -lmpi
    #FFLAGS += -fp-model source
    ifeq ($(DEBUG),1)
       FFLAGS += -warn all -O0 -g -traceback -check bounds -check all -debug -ftrapuv -fpp
