@@ -29,7 +29,7 @@ Alternatively, follow the instructions below to set up a RASCAS environment usin
 conda update -n base conda
 ```
 
-2. Download the environment file [rascas-environment.yml](https://git-cral.univ-lyon1.fr/rascas/rascas/-/blob/SaasFee/doc/rascas-environment.yml)
+2. Download the environment file [rascas-environment.yml](https://git-cral.univ-lyon1.fr/rascas/rascas/-/raw/SaasFee/doc/rascas-environment.yml)
 
 3. Create the environment from the ``rascas-environment.yml`` file by executing the command below in a terminal.
 ```
