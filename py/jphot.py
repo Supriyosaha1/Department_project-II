@@ -265,6 +265,21 @@ class photonlist(object):
         return bin_centers, h 
 
     
+    def projected_radius(self,xc=0.5,yc=0.5,zc=0.5):
+        # compute the "angle-averaged" projected radius
+
+        ux, uy, uz = np.empty_like(self.x), np.empty_like(self.x), np.empty_like(self.x)
+        unorm, costheta, rp = np.empty_like(self.x), np.empty_like(self.x), np.empty_like(self.x)
+
+        unorm    = np.sqrt((self.x-xc)**2+(self.y-yc)**2+(self.z-zc)**2)
+        ux       = np.nan_to_num((self.x-xc)/unorm)
+        uy       = np.nan_to_num((self.y-yc)/unorm)
+        uz       = np.nan_to_num((self.z-zc)/unorm)
+        costheta = self.kx*ux + self.ky*uy + self.kz*uz
+        rp       = unorm * np.sqrt(1.0-costheta*costheta)
+        return rp
+
+
     def project_pos(self,k,thetamax):
         # compute projected positions (x,y) of photons going along k, in a plane perp. to k.
         # NB: used with thetamax=180, this selects all photons and may be used to compute
@@ -351,5 +366,4 @@ def projected_positions(k,x,y,z,xc,yc,zc):
 
     return xp,yp
 
-    
-    
+
