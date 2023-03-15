@@ -1,4 +1,5 @@
-tutorial_1 : homogeneous sphere
+tutorial_1 : continuum through a homogeneous sphere
+tutorial_1bis: emission line through a homogeneous sphere
 tutorial_2 : model of Burchett (thick shell with density \propto 1/r^2 and velocity going linearly with radius).
 
 
