@@ -4,7 +4,7 @@
 # Compiler flavor: GNU or INTEL
 COMPILER = GNU
 # compiler name
-F90 = gfortran
+F90 = mpif90
 # Do we want a debug build? 1=Yes, 0=No
 DEBUG = 0
 # Use of OpenMP? 1=Yes, 0=No
