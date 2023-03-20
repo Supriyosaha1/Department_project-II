@@ -8,7 +8,7 @@ class gas(object):
     """ This class defines gas objects.
     """
     
-    def __init__(self,mix,nhi,dopwidth,vleaf,ndust,xleaf,leaflevel):
+    def __init__(self,mix,nhi,dopwidth,vleaf,ndust,xleaf,leaflevel,vturb):
        
         self.mix = mix
         if self.mix == 'HI':
@@ -25,8 +25,16 @@ class gas(object):
             self.xleaf     = xleaf
             self.leaflevel = leaflevel
         elif self.mix == 'SiII_dust':
-            self.nSiII     = nSiII
+            self.nSiII     = nhi
             self.dopwidth  = dopwidth
+            self.vleaf     = vleaf
+            self.ndust     = ndust
+            self.xleaf     = xleaf
+            self.leaflevel = leaflevel
+        elif self.mix == 'new_ions':
+            self.nion      = nhi
+            self.dopwidth  = dopwidth
+            self.vturb     = vturb
             self.vleaf     = vleaf
             self.ndust     = ndust
             self.xleaf     = xleaf
@@ -112,13 +120,39 @@ class mesh(object):
             # read type gas (composition dependant...)
             if gasmix is None:
                 gasmix = 'HI_D_dust'
-            # to do pure HI 
-            if gasmix == ('HI_D_dust' or 'HI_dust'):
+            if gasmix == ('HI'):
+                # for pure HI composition
+                print("-----> gas")
+                # velocity
+                v = f.read_reals('d')
+                v = v.reshape((self.nleaf,3))
+                print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
+                # nHI
+                nHI = f.read_reals('d')
+                print("INFO gas nHI:",np.shape(nHI),np.amin(nHI),np.amax(nHI))
+                # dopwidth
+                dopwidth = f.read_reals('d')
+                print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
+                # boxsize
+                [box_size_cm] = f.read_reals('d')
+                print("boxsize [cm] =",box_size_cm)
+                f.close()
+                # get leaf positions
+                xleaf = self.get_leaf_position()
+                # get leaf level
+                leaflevel = self.get_leaf_level()
+                # Re-indexing gas mix arrays
+                ileaf = np.where(self.son<0)
+                icell = np.abs(self.son[ileaf])
+                #print(np.shape(icell), np.amin(icell), np.amax(icell))
+                ndust = 0
+                self.gas = gas(gasmix, nHI[icell-1], dopwidth[icell-1], v[icell-1,:], ndust, xleaf, leaflevel)
+            elif gasmix == ('HI_D_dust' or 'HI_dust'):
                 # for HI (D) dust composition
                 print("-----> gas")
                 # velocity
                 v = f.read_reals('d')
-                v = v.reshape((3,self.nleaf)) # ou (3,nleaf)??? to be checked
+                v = v.reshape((self.nleaf,3))
                 print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
                 # nHI
                 nHI = f.read_reals('d')
@@ -140,14 +174,14 @@ class mesh(object):
                 # Re-indexing gas mix arrays
                 ileaf = np.where(self.son<0)
                 icell = np.abs(self.son[ileaf])
-                print(np.shape(icell), np.amin(icell), np.amax(icell))
-                self.gas = gas(gasmix, nHI[icell-1], dopwidth[icell-1], v[:,icell-1], ndust[icell-1], xleaf, leaflevel)
+                #print(np.shape(icell), np.amin(icell), np.amax(icell))
+                self.gas = gas(gasmix, nHI[icell-1], dopwidth[icell-1], v[icell-1,:], ndust[icell-1], xleaf, leaflevel)
             elif gasmix == 'SiII_dust':
                 # for SiII and dust composition
                 print("-----> gas")
                 # velocity
                 v = f.read_reals('d')
-                v = v.reshape((3,self.nleaf)) # ou (3,nleaf)??? to be checked
+                v = v.reshape((self.nleaf,3))
                 print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
                 # nHI
                 nSiII = f.read_reals('d')
@@ -169,11 +203,45 @@ class mesh(object):
                 # Re-indexing gas mix arrays
                 ileaf = np.where(self.son<0)
                 icell = np.abs(self.son[ileaf])
-                print(np.shape(icell), np.amin(icell), np.amax(icell))
-                self.gas = gas(gasmix, nSiII[icell-1], dopwidth[icell-1], v[:,icell-1], ndust[icell-1], xleaf, leaflevel)
+                #print(np.shape(icell), np.amin(icell), np.amax(icell))
+                self.gas = gas(gasmix, nSiII[icell-1], dopwidth[icell-1], v[icell-1,:], ndust[icell-1], xleaf, leaflevel)
+            elif gasmix == 'new_ions':
+                # for new ions version...
+                print("-----> gas")
+                # velocity
+                v = f.read_reals('d')
+                v = v.reshape((self.nleaf,3))
+                print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
+                # density /!\ for one element only !!!!
+                nion = f.read_reals('d')
+                print("INFO gas nion:",np.shape(nion),np.amin(nion),np.amax(nion))
+                # dopwidth
+                dopwidth = f.read_reals('d')
+                print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
+                # vturb
+                vturb = f.read_reals('d')
+                print("INFO gas vturb:",np.shape(vturb),np.amin(vturb),np.amax(vturb))
+                # ndust
+                ndust = f.read_reals('d')
+                print("INFO gas ndust:",np.shape(ndust),np.amin(ndust),np.amax(ndust))
+                # boxsize
+                [box_size_cm] = f.read_reals('d')
+                print("boxsize [cm] =",box_size_cm)
+                f.close()
+                # get leaf positions
+                xleaf = self.get_leaf_position()
+                # get leaf level
+                leaflevel = self.get_leaf_level()                
+                # Re-indexing gas mix arrays
+                ileaf = np.where(self.son<0)
+                icell = np.abs(self.son[ileaf])
+                #print(np.shape(icell), np.amin(icell), np.amax(icell))
+                self.gas = gas(gasmix, nion[icell-1], dopwidth[icell-1], v[icell-1,:], ndust[icell-1], xleaf, leaflevel, vturb)
             else:
                 #return IOError("mix not defined",gasmix)
                 raise NameError("mix not defined",gasmix)
+            print("-----> reading done.")
+            print()
 
 
     def get_leaf_position(self):    
@@ -181,6 +249,7 @@ class mesh(object):
 
         print("-----> get xleaf")
         ileaf = np.where(self.son<0)
+        #print(ileaf)
         # <<< not necessary...
         #ileaf = np.array(ileaf)
         #ileaf = ileaf.reshape(ileaf.size)
@@ -194,23 +263,32 @@ class mesh(object):
         #ioct = icell - ncoarse - ind*noct
         # here icell is ileaf
         ind  = (ileaf - self.ncoarse - 1)//self.noct + 1
+        #print(ind)
         ioct = ileaf - self.ncoarse - (ind-1)*self.noct
-        print("ind info: ",np.shape(ind),np.min(ind),np.max(ind))#,np.dtype(ind[0])
-        print("ioct info:",np.shape(ioct),np.min(ioct),np.max(ioct))
+        #print("ind info: ",np.shape(ind),np.min(ind),np.max(ind))#,np.dtype(ind[0])
+        #print("ioct info:",np.shape(ioct),np.min(ioct),np.max(ioct))
         xleaf = np.zeros((3,self.nleaf))
+        #print(np.shape(self.octlevel))
+        #print(ioct)
         cell_level = self.octlevel[ioct]
-        print("cell_level info:",np.shape(cell_level),np.min(cell_level),np.max(cell_level))
+        #cell_level = np.empty([self.nleaf],dtype=int)
+        #print("cell_level info:",np.shape(cell_level),np.min(cell_level),np.max(cell_level))
+        #ioct=ioct.reshape(ioct.size)
+        #for i in range(self.nleaf):
+        ##    print(i, ioct[i])
+        #   cell_level[i] = self.octlevel[ioct[i]-1]
+        #print("cell_level info:",np.shape(cell_level),np.min(cell_level),np.max(cell_level))
 
         # this is the convention used in RASCAS
         offset = np.array((-.5,-.5,-.5, +.5,-.5,-.5, -.5,+.5,-.5, +.5,+.5,-.5, -.5,-.5,+.5, +.5,-.5,+.5, -.5,+.5,+.5, +.5,+.5,+.5),dtype=float).reshape((8,3))
-        print(offset[0,:])
-        print(offset[1,:])
-        print(offset[2,:])
-        print(offset[3,:])
-        print(offset[4,:])
-        print(offset[5,:])
-        print(offset[6,:])
-        print(offset[7,:])
+        #print(offset[0,:])
+        #print(offset[1,:])
+        #print(offset[2,:])
+        #print(offset[3,:])
+        #print(offset[4,:])
+        #print(offset[5,:])
+        #print(offset[6,:])
+        #print(offset[7,:])
 
         # cell size
         dx = 0.5**cell_level
@@ -233,8 +311,8 @@ class mesh(object):
         #icell = np.abs(self.son[ileaf])
         ind  = (ileaf - self.ncoarse - 1)//self.noct + 1
         ioct = ileaf - self.ncoarse - (ind-1)*self.noct
-        print("INFO ind:       ",np.shape(ind),np.amin(ind),np.amax(ind))#,np.dtype(ind[0])
-        print("INFO ioct:      ",np.shape(ioct),np.amin(ioct),np.amax(ioct))
+        #print("INFO ind:       ",np.shape(ind),np.amin(ind),np.amax(ind))#,np.dtype(ind[0])
+        #print("INFO ioct:      ",np.shape(ioct),np.amin(ioct),np.amax(ioct))
         cell_level = np.copy(self.octlevel[ioct])
         cell_level = np.reshape(cell_level,cell_level.size)
         print("INFO cell_level:",np.shape(cell_level), np.amin(cell_level),np.amax(cell_level))
