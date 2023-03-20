@@ -44,7 +44,7 @@ class mesh(object):
     """ This class manages mesh objects, which contain a domain object, the mesh data structure itself, and a gas object.
     """
     
-    def __init__(self, filename=None, gasmix=None):
+    def __init__(self, filename=None, gasmix=None, Silent=True):
 
         if filename is None:
             self.domain   = None
@@ -59,25 +59,26 @@ class mesh(object):
             self.xleaf    = None
             self.gas      = None
         else:
-            print("-----> reading mesh in file ",filename)
+            if not(Silent): print("-----> reading mesh in file ",filename)
             f = ff(filename)
             
             # read domain
             #domainType = str(f.read_record('a10')[0])
             #domainType = domainType.strip()
             domainType = (f.read_record('S10')[0]).decode('UTF-8').strip()
-            print("-----> domain")
-            print("domain type =", domainType)
+            if not(Silent):
+                print("-----> domain")
+                print("domain type =", domainType)
             if domainType == 'sphere':
                 center = f.read_reals('d')
                 radius = f.read_reals('d')
-                print("domain size =",radius)
+                if not(Silent): print("domain size =",radius)
                 self.domain    = d.sphere(center,radius)
             elif domainType == 'shell':
                 center = f.read_reals('d')
                 rin    = f.read_reals('d')
                 rout   = f.read_reals('d')
-                print("domain size =",rin,rout)
+                if not(Silent): print("domain size =",rin,rout)
                 self.domain    = d.shell(center=center,rin=rin,rout=rout)
             elif domainType == 'cube':
                 center = f.read_reals('d')
@@ -90,57 +91,58 @@ class mesh(object):
                 self.domain = d.slab(zc,thickness)
             else:
                 return IOError("type not defined",domainType)
-            print("domain center =",center)
+            if not(Silent): print("domain center =",center)
     
             # read mesh
             [self.ncoarse,self.noct,self.ncell,self.nleaf] = f.read_ints()
-            print("-----> mesh")
-            print("ncoarse =",self.ncoarse)
-            print("noct    =",self.noct)
-            print("ncell   =",self.ncell)
-            print("nleaf   =",self.nleaf)
+            if not(Silent): 
+                print("-----> mesh")
+                print("ncoarse =",self.ncoarse)
+                print("noct    =",self.noct)
+                print("ncell   =",self.ncell)
+                print("nleaf   =",self.nleaf)
             # father
             self.father = f.read_ints()
-            print("INFO father   ",np.shape(self.father),np.min(self.father),np.max(self.father))
+            if not(Silent): print("INFO father   ",np.shape(self.father),np.min(self.father),np.max(self.father))
             # son
             self.son = f.read_ints()
-            print("INFO son      ",np.shape(self.son),np.min(self.son),np.max(self.son))
+            if not(Silent): print("INFO son      ",np.shape(self.son),np.min(self.son),np.max(self.son))
             # nbor
             nbor = f.read_ints()
             self.nbor = nbor.reshape((6,self.noct))
-            print("INFO nbor     ",np.shape(self.nbor),np.min(self.nbor),np.max(self.nbor))
+            if not(Silent): print("INFO nbor     ",np.shape(self.nbor),np.min(self.nbor),np.max(self.nbor))
             # octlevel
             self.octlevel = f.read_ints()
-            print("INFO octlevel ",np.shape(self.octlevel),np.min(self.octlevel),np.max(self.octlevel))
+            if not(Silent): print("INFO octlevel ",np.shape(self.octlevel),np.min(self.octlevel),np.max(self.octlevel))
             # xoct
             xoct = f.read_reals('d')
             self.xoct = xoct.reshape((3,self.noct))
-            print("INFO xoct     ",np.shape(self.xoct),np.min(self.xoct),np.max(self.xoct)) ###,np.dtype(xoct[0,0])
+            if not(Silent): print("INFO xoct     ",np.shape(self.xoct),np.min(self.xoct),np.max(self.xoct)) ###,np.dtype(xoct[0,0])
 
             # read type gas (composition dependant...)
             if gasmix is None:
                 gasmix = 'HI_D_dust'
             if gasmix == ('HI'):
                 # for pure HI composition
-                print("-----> gas")
+                if not(Silent): print("-----> gas")
                 # velocity
                 v = f.read_reals('d')
                 v = v.reshape((self.nleaf,3))
-                print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
+                if not(Silent): print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
                 # nHI
                 nHI = f.read_reals('d')
-                print("INFO gas nHI:",np.shape(nHI),np.amin(nHI),np.amax(nHI))
+                if not(Silent): print("INFO gas nHI:",np.shape(nHI),np.amin(nHI),np.amax(nHI))
                 # dopwidth
                 dopwidth = f.read_reals('d')
-                print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
+                if not(Silent): print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
                 # boxsize
                 [box_size_cm] = f.read_reals('d')
-                print("boxsize [cm] =",box_size_cm)
+                if not(Silent): print("boxsize [cm] =",box_size_cm)
                 f.close()
                 # get leaf positions
-                xleaf = self.get_leaf_position()
+                xleaf = self.get_leaf_position(Silent)
                 # get leaf level
-                leaflevel = self.get_leaf_level()
+                leaflevel = self.get_leaf_level(Silent)
                 # Re-indexing gas mix arrays
                 ileaf = np.where(self.son<0)
                 icell = np.abs(self.son[ileaf])
@@ -149,28 +151,28 @@ class mesh(object):
                 self.gas = gas(gasmix, nHI[icell-1], dopwidth[icell-1], v[icell-1,:], ndust, xleaf, leaflevel)
             elif gasmix == ('HI_D_dust' or 'HI_dust'):
                 # for HI (D) dust composition
-                print("-----> gas")
+                if not(Silent): print("-----> gas")
                 # velocity
                 v = f.read_reals('d')
                 v = v.reshape((self.nleaf,3))
-                print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
+                if not(Silent): print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
                 # nHI
                 nHI = f.read_reals('d')
-                print("INFO gas nHI:",np.shape(nHI),np.amin(nHI),np.amax(nHI))
+                if not(Silent): print("INFO gas nHI:",np.shape(nHI),np.amin(nHI),np.amax(nHI))
                 # dopwidth
                 dopwidth = f.read_reals('d')
-                print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
+                if not(Silent): print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
                 # ndust
                 ndust = f.read_reals('d')
-                print("INFO gas ndust:",np.shape(ndust),np.amin(ndust),np.amax(ndust))
+                if not(Silent): print("INFO gas ndust:",np.shape(ndust),np.amin(ndust),np.amax(ndust))
                 # boxsize
                 [box_size_cm] = f.read_reals('d')
-                print("boxsize [cm] =",box_size_cm)
+                if not(Silent): print("boxsize [cm] =",box_size_cm)
                 f.close()
                 # get leaf positions
-                xleaf = self.get_leaf_position()
+                xleaf = self.get_leaf_position(Silent)
                 # get leaf level
-                leaflevel = self.get_leaf_level()
+                leaflevel = self.get_leaf_level(Silent)
                 # Re-indexing gas mix arrays
                 ileaf = np.where(self.son<0)
                 icell = np.abs(self.son[ileaf])
@@ -178,28 +180,28 @@ class mesh(object):
                 self.gas = gas(gasmix, nHI[icell-1], dopwidth[icell-1], v[icell-1,:], ndust[icell-1], xleaf, leaflevel)
             elif gasmix == 'SiII_dust':
                 # for SiII and dust composition
-                print("-----> gas")
+                if not(Silent): print("-----> gas")
                 # velocity
                 v = f.read_reals('d')
                 v = v.reshape((self.nleaf,3))
-                print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
+                if not(Silent): print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
                 # nHI
                 nSiII = f.read_reals('d')
-                print("INFO gas nSiII:",np.shape(nSiII),np.amin(nSiII),np.amax(nSiII))
+                if not(Silent): print("INFO gas nSiII:",np.shape(nSiII),np.amin(nSiII),np.amax(nSiII))
                 # dopwidth
                 dopwidth = f.read_reals('d')
-                print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
+                if not(Silent): print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
                 # ndust
                 ndust = f.read_reals('d')
-                print("INFO gas ndust:",np.shape(ndust),np.amin(ndust),np.amax(ndust))
+                if not(Silent): print("INFO gas ndust:",np.shape(ndust),np.amin(ndust),np.amax(ndust))
                 # boxsize
                 [box_size_cm] = f.read_reals('d')
-                print("boxsize [cm] =",box_size_cm)
+                if not(Silent): print("boxsize [cm] =",box_size_cm)
                 f.close()
                 # get leaf positions
-                xleaf = self.get_leaf_position()
+                xleaf = self.get_leaf_position(Silent)
                 # get leaf level
-                leaflevel = self.get_leaf_level()                
+                leaflevel = self.get_leaf_level(Silent)                
                 # Re-indexing gas mix arrays
                 ileaf = np.where(self.son<0)
                 icell = np.abs(self.son[ileaf])
@@ -207,31 +209,31 @@ class mesh(object):
                 self.gas = gas(gasmix, nSiII[icell-1], dopwidth[icell-1], v[icell-1,:], ndust[icell-1], xleaf, leaflevel)
             elif gasmix == 'new_ions':
                 # for new ions version...
-                print("-----> gas")
+                if not(Silent): print("-----> gas")
                 # velocity
                 v = f.read_reals('d')
                 v = v.reshape((self.nleaf,3))
-                print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
+                if not(Silent): print("INFO gas v:",np.shape(v),np.amin(v),np.amax(v))
                 # density /!\ for one element only !!!!
                 nion = f.read_reals('d')
-                print("INFO gas nion:",np.shape(nion),np.amin(nion),np.amax(nion))
+                if not(Silent): print("INFO gas nion:",np.shape(nion),np.amin(nion),np.amax(nion))
                 # dopwidth
                 dopwidth = f.read_reals('d')
-                print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
+                if not(Silent): print("INFO gas dopwidth:",np.shape(dopwidth),np.amin(dopwidth),np.amax(dopwidth))
                 # vturb
                 vturb = f.read_reals('d')
-                print("INFO gas vturb:",np.shape(vturb),np.amin(vturb),np.amax(vturb))
+                if not(Silent): print("INFO gas vturb:",np.shape(vturb),np.amin(vturb),np.amax(vturb))
                 # ndust
                 ndust = f.read_reals('d')
-                print("INFO gas ndust:",np.shape(ndust),np.amin(ndust),np.amax(ndust))
+                if not(Silent): print("INFO gas ndust:",np.shape(ndust),np.amin(ndust),np.amax(ndust))
                 # boxsize
                 [box_size_cm] = f.read_reals('d')
-                print("boxsize [cm] =",box_size_cm)
+                if not(Silent): print("boxsize [cm] =",box_size_cm)
                 f.close()
                 # get leaf positions
-                xleaf = self.get_leaf_position()
+                xleaf = self.get_leaf_position(Silent)
                 # get leaf level
-                leaflevel = self.get_leaf_level()                
+                leaflevel = self.get_leaf_level(Silent)
                 # Re-indexing gas mix arrays
                 ileaf = np.where(self.son<0)
                 icell = np.abs(self.son[ileaf])
@@ -240,14 +242,14 @@ class mesh(object):
             else:
                 #return IOError("mix not defined",gasmix)
                 raise NameError("mix not defined",gasmix)
-            print("-----> reading done.")
-            print()
+            if not(Silent): print("-----> reading done.")
+            if not(Silent): print()
 
 
-    def get_leaf_position(self):    
+    def get_leaf_position(self,Silent):    
         """ get the leaf cell positions from oct positions"""
 
-        print("-----> get xleaf")
+        if not(Silent): print("-----> get xleaf")
         ileaf = np.where(self.son<0)
         #print(ileaf)
         # <<< not necessary...
@@ -293,20 +295,20 @@ class mesh(object):
         # cell size
         dx = 0.5**cell_level
         dx = np.reshape(dx,dx.size)
-        print("INFO dx:   ",np.shape(dx), np.amin(dx),np.amax(dx))
+        if not(Silent): print("INFO dx:   ",np.shape(dx), np.amin(dx),np.amax(dx))
 
         xleaf[0,:] = self.xoct[0,ioct] + offset[ind-1,0]*dx
         xleaf[1,:] = self.xoct[1,ioct] + offset[ind-1,1]*dx
         xleaf[2,:] = self.xoct[2,ioct] + offset[ind-1,2]*dx
-        print("INFO xleaf:",np.shape(xleaf),np.min(xleaf),np.max(xleaf))
+        if not(Silent): print("INFO xleaf:",np.shape(xleaf),np.min(xleaf),np.max(xleaf))
     
         return xleaf
 
 
-    def get_leaf_level(self):
+    def get_leaf_level(self,Silent):
         """ get the level of leaf cells"""
 
-        print("-----> get leaf level")
+        if not(Silent): print("-----> get leaf level")
         ileaf = np.where(self.son<0)
         #icell = np.abs(self.son[ileaf])
         ind  = (ileaf - self.ncoarse - 1)//self.noct + 1
@@ -315,6 +317,6 @@ class mesh(object):
         #print("INFO ioct:      ",np.shape(ioct),np.amin(ioct),np.amax(ioct))
         cell_level = np.copy(self.octlevel[ioct])
         cell_level = np.reshape(cell_level,cell_level.size)
-        print("INFO cell_level:",np.shape(cell_level), np.amin(cell_level),np.amax(cell_level))
+        if not(Silent): print("INFO cell_level:",np.shape(cell_level), np.amin(cell_level),np.amax(cell_level))
         return cell_level
 
