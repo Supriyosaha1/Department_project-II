@@ -12,3 +12,4 @@ isotropic = F
 recoil    = T
 core_skip = T
 xcritmax  = 100.
+lee_correction = F
