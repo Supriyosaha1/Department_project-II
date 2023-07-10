@@ -75,16 +75,16 @@ OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
 
 #############################################################################
 ifeq ($(MPI),1)
-all: clean CreateDomDumpAMRModel PhotonsFromSourceModel rascas rascas-serial
+all: clean GenerateAMRmodel PhotonsFromSourceModel rascas rascas-serial
 else
-all: clean CreateDomDumpAMRModel PhotonsFromSourceModel rascas-serial
+all: clean GenerateAMRmodel PhotonsFromSourceModel rascas-serial
 endif
 
 PhotonsFromSourceModel: $(OBJSPHO) PhotonsFromSourceModel.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) PhotonsFromSourceModel.o
 
-CreateDomDumpAMRModel: $(OBJSDOM) CreateDomDumpAMRModel.o
-	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) CreateDomDumpAMRModel.o
+GenerateAMRmodel: $(OBJSDOM) GenerateAMRmodel.o
+	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) GenerateAMRmodel.o
 
 rascas-serial: $(OBJSPHO) rascas-serial.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSPHO) rascas-serial.o
