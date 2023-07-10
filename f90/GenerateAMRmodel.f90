@@ -241,7 +241,7 @@ contains
     do
        read (10,'(a)',iostat=err) line
        if(err/=0) exit
-       if (line(1:15) == '[GenerateAMRmodel]') then
+       if (line(1:18) == '[GenerateAMRmodel]') then
           section_present = .true.
           exit
        end if
