@@ -29,7 +29,7 @@ Alternatively, follow the instructions below to set up a RASCAS environment usin
 conda update -n base conda
 ```
 
-2. Download the environment file [rascas-environment.yml](https://git-cral.univ-lyon1.fr/rascas/rascas/-/raw/SaasFee/doc/rascas-environment.yml)
+2. Download the environment file [rascas-environment.yml](https://git-cral.univ-lyon1.fr/rascas/rascas/-/blob/develop/doc/rascas-environment.yml)
 
 3. Create the environment from the ``rascas-environment.yml`` file by executing the command below in a terminal.
 ```
@@ -56,31 +56,35 @@ There are two options here. The first one (recommended) is to get the code using
 ### Using git
 In a terminal, run the following commands. 
 ```
-git clone https://git-cral.univ-lyon1.fr/rascas/rascas.git rascas-SaasFee
-cd rascas-SaasFee
-git checkout -b SaasFee --track origin/SaasFee
+git clone https://git-cral.univ-lyon1.fr/rascas/rascas.git
+cd rascas
+git checkout -b develop--track origin/develop
 ```
 
 ### Simple download
 
 Alternatively, you can obtain a tarball of the code using either `curl` or `wget`
 ```
-curl -O https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/SaasFee/rascas-SaasFee.tar.gz
+curl -O https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/develop/rascas-develop.tar.gz
 ```
 or
 ```
-wget https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/SaasFee/rascas-SaasFee.tar.gz
+wget https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/develop/rascas-develop.tar.gz
 ```
 Then, you can untar and uncompress the file with 
 ```
-tar zxvf rascas-SaasFee.tar.gz
+tar zxvf rascas-develop.tar.gz
+```
+And rename the directory (to be consistent with the git method)
+```
+mv rascas-develop rascas
 ```
 
 ## Building the code
 
-Now, you can go to `rascas-SaasFee/f90/` and compile the code with
+Now, you can go to `rascas/f90/` and compile the code with
 ```
-cd rascas-SaasFee/f90
+cd rascas/f90
 make all F90=mpif90
 ```
 
@@ -93,7 +97,7 @@ make all F90=gfortran MPI=0
 
 To test your installation, you can run the first tutorial notebook
 ```
-cd rascas-SaasFee/tutorials/tutorial_1/
+cd rascas/tutorials/tutorial_1/
 make all F90=mpif90
 jupyter-notebook Tutorial-1.ipynb
 ```
@@ -105,7 +109,7 @@ You should be able to run succesfully the whole notebook!
 
 ***
 
-**Contact for questions or comments:** leo.michel-dansac@univ-lyon1.fr
+**Contact for questions or comments:** rascas@univ-lyon1.fr
 
 ***
 
