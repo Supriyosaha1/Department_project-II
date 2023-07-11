@@ -34,10 +34,11 @@ module module_scatterer_model
      real(kind=8)                  :: sigma_factor      ! Cross-section factor-> multiply by Voigt(x,a)/delta_nu_doppler to get sigma.
 
      ! parameters to control approximations in RT. Default values should be used for other lines than HI-1216. 
-     logical                       :: recoil       = .false.     ! if set to true, recoil effect is computed
-     logical                       :: isotropic    = .true.      ! if set to true, scattering events will be isotropic
-     logical                       :: core_skip    = .false.     ! if true, skip scatterings in the core of the line (as in Smith+15). !!! Use only for Hydrogen Lya !!! 
-     real(kind=8)                  :: xcritmax     = 3.0d0       ! core-skipping will truncate at min(xcrit, xcritmax). Used only if core_skip is true.  
+     logical                       :: recoil         = .false.  ! if set to true, recoil effect is computed
+     logical                       :: isotropic      = .true.   ! if set to true, scattering events will be isotropic
+     logical                       :: core_skip      = .false.  ! if true, skip scatterings in the core of the line (as in Smith+15). !!! Use only for Hydrogen Lya !!! 
+     real(kind=8)                  :: xcritmax       = 3.0d0    ! core-skipping will truncate at min(xcrit, xcritmax). Used only if core_skip is true.
+     logical                       :: lee_correction = .false.  ! Lee correction (for HI Lya only), see Lee (2013) or Dijkstra (2014)
 
   end type scatterer
   
@@ -76,6 +77,11 @@ contains
     h_cell = voigt_function(x_cell,a)
     sigma = s%sigma_factor / delta_nu_doppler * h_cell
 
+    ! Lee correction (for HI Lya only), see Lee (2013) or Dijkstra (2014)
+    if(s%lee_correction)then
+       sigma = sigma * (1.0d0 - 1.792d0*x_cell*delta_nu_doppler/s%nu)
+    endif
+    
     get_tau = sigma * nscat * distance_to_border_cm
 
     return
@@ -390,6 +396,8 @@ contains
           case ('xcritmax')
              read(value,*) s%xcritmax
           !--PIKSEROC--
+          case ('lee_correction') 
+             read(value,*) s%lee_correction
           end select
        end do
        close(10)
@@ -400,7 +408,15 @@ contains
        print*,'ERROR: core skipping is on but xcritmax is not set... '
        stop
     end if
-    !--PIKSEROC-- 
+    !--PIKSEROC--
+
+    !--Lee correction--  sanity check ... 
+    if (s%lee_correction .and. s%name_ion /= 'HI') then
+       print*,'ERROR: Lee correction is only valid for the HI-1216 line...'
+       stop
+    end if
+    !----
+
     
     call read_uparallel_params(pfile)
     call read_voigt_params(pfile)
@@ -441,6 +457,7 @@ contains
        if(s%core_skip)then
           write(unit,'(a,ES10.3)') '  xcritmax       = ',s%xcritmax
        endif
+       write(unit,'(a,L)')      '  lee_correction =  ',s%lee_correction
        write(unit,'(a)') ' '
        call print_uparallel_params(unit)
        call print_voigt_params(unit)
@@ -463,6 +480,7 @@ contains
        if(s%core_skip)then
           write(*,'(a,ES10.3)') '  xcritmax       = ',s%xcritmax
        endif
+       write(*,'(a,L)')      '  lee_correction =  ',s%lee_correction
        write(*,'(a)') ' '
        call print_uparallel_params
        call print_voigt_params
