@@ -1,0 +1,16 @@
+name: rascas-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - scipy
+  - make
+  - astropy
+  - numpy
+  - gfortran
+  - git
+  - jupyter
+  - python=3.9
+  - matplotlib
+  - openmpi
+

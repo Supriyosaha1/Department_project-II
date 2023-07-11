@@ -2,7 +2,8 @@ module module_mesh
 
   use module_domain
   use module_gas_composition
-
+  use module_idealised_model
+  
   implicit none
 
   type, public :: mesh
@@ -43,12 +44,20 @@ module module_mesh
   ! user-defined parameters - read from section [mesh] in the parameter file 
   ! --------------------------------------------------------------------------
   logical :: verbose = .true.      ! set to true to display floods of messages ... 
+  ! --- parameters for the refinement of AMR idealised models
+  integer(kind=4) :: refine_lmax = 8
+  real(kind=8)    :: refine_err_grad_d = -1.d0 
+  real(kind=8)    :: refine_err_grad_v = -1.d0
+  logical         :: refine_dv_over_vth = .false.
   ! --------------------------------------------------------------------------
   
-  public :: mesh_from_leaves, mesh_from_file, mesh_destructor, dump_mesh, whereisphotongoing, dig_in_cell, &
-       in_cell_finder, get_cell_corner, read_mesh_params, print_mesh_params
-  private :: add_oct_domain, make_nbor_array, xcson, get_nleaflocal, get_ileaflocal, icell2icell
+  public :: mesh_from_leaves, mesh_from_file, mesh_destructor, dump_mesh, mesh_from_model
+  public :: whereisphotongoing, dig_in_cell, in_cell_finder, get_cell_corner, &
+       read_mesh_params, print_mesh_params
 
+  private :: add_oct_domain, make_nbor_array, xcson, get_nleaflocal, get_ileaflocal, icell2icell
+  private :: refine, in_cell_finder_womesh
+  
   contains
 
     !<><><><><><><><><><><><><><><><><><><><><>
@@ -57,6 +66,7 @@ module module_mesh
     !------------------
     ! subroutine mesh_from_leaves(nOctMax,dom,nleaves,leaves,xleaves,leaveslevel,mesh)
     ! subroutine mesh_from_file(file,mesh)
+    ! subroutine mesh_from_model(domain,mesh,noctmax)
     !
     ! public use
     !------------
@@ -76,6 +86,8 @@ module module_mesh
     ! function get_ileaflocal
     ! function icell2icell
     ! some routines for checking & verbosity
+    ! function refine
+    ! function in_cell_finder_womesh
     !
     !<><><><><><><><><><><><><><><><><><><><><>
 
@@ -83,6 +95,7 @@ module module_mesh
     !===============================================================================================
     ! mesh constructors
     !===============================================================================================
+
     
     subroutine mesh_from_leaves(nOctMax,dom,nleaves,leaves,xleaves,leaveslevel,m)
 
@@ -268,6 +281,310 @@ module module_mesh
       close(13)
       
     end subroutine mesh_from_file
+
+
+
+    subroutine mesh_from_model(dom,shem,noctmax)
+
+      type(domain),intent(in)                  :: dom
+      type(mesh),intent(out)                   :: shem
+      integer(kind=4),intent(in)               :: noctmax
+      !:::::internal variables::::
+      integer(kind=4)                          :: l,ncellmax,ileaf,inewoct,icell,ind,ioct
+      integer(kind=4),dimension(:),allocatable :: first,numb,head,next,last
+      real(kind=8),dimension(3)                :: xc,xv,x
+      real(kind=8)                             :: dx
+      integer(kind=4)                          :: indv,ioctv,lv,icellv,indn,ix,iy,iz,level,i
+      real(kind=8),dimension(:,:),allocatable  ::pos_leaf
+      integer(kind=4),dimension(:),allocatable ::level_leaf,indleaf
+      type(gas),dimension(:),allocatable       :: g
+      integer(kind=4)                          :: nocttrue
+      
+      ! 3 steps:
+      !   - first pass
+      !   - regularization
+      !   - compute leaves properties
+      ! + construct/instantiate mesh structure
+      
+      allocate(first(refine_lmax),numb(refine_lmax))
+      
+      ! first pass, refine grid thanks to refinement criteria
+      ncoarse = 1
+      ncellmax = ncoarse + 8*noctmax
+      first = -1 ; numb=0
+      first(1) = 1
+      numb(1) = 1
+      ileaf = 0
+
+      allocate(son(1:ncellmax))
+      allocate(father(1:noctmax))
+      allocate(octlevel(1:noctmax))
+      allocate(xoct(1:noctmax,1:3))
+      son=0
+      father=-1
+      octlevel=-1
+      xoct=-99.
+
+      ! first oct
+      xoct(1,1:3) = (/0.5d0,0.5d0,0.5d0/)
+      octlevel(1)=1
+      son(1)=1
+      father(1)=1
+      
+      do l=1,refine_lmax-1 ! loop over levels
+         if(first(l)>0)then
+            inewoct = first(l)+numb(l)
+            print*,l,first(l),inewoct
+            do ioct=first(l),first(l)+numb(l)-1  ! loop over oct at level l
+               do ind=1,8
+                  icell = ncoarse+ioct+(ind-1)*noctmax
+                  dx = 0.5d0**(l)
+                  xc(1:3) = xoct(ioct,1:3) + offset(1:3,ind)*dx  ! is it offset or should we use xcson function????
+                  ! only refine a cell if it interesects domain
+                  if (.not.domain_contains_cell(xc,dx,dom)) cycle
+                  if(refine(xc,l,refine_lmax))then ! keep refining and create a new oct at level l+1
+                     if(first(l+1)==-1)then
+                        first(l+1)=inewoct
+                     endif
+                     son(icell)=inewoct
+                     father(inewoct) = icell
+                     numb(l+1) = numb(l+1)+1
+                     xoct(inewoct,1:3) = xc(1:3)
+                     octlevel(inewoct) = l+1
+                     inewoct = inewoct+1
+                     !else ! else stop refining and create a leaf cell --> not necessary here, we will do it later
+                     !      ileaf=ileaf+1
+                     !      son(icell) = -ileaf
+                     !      props(ileaf) = model
+                  endif
+               enddo
+            enddo
+         endif ! if first(l)<=0 what happens? => no new oct at level(l), no need to refine more
+      enddo
+
+      print*,' '
+      print*,'regularization'
+      ! now, regularization of the refined grid
+      allocate(head(refine_lmax),next(noctmax),last(refine_lmax))
+      head = -1 ; next = -1 ; last = -1
+      do l=1,refine_lmax
+         head(l) = first(l)
+         print*,'head =',l,head(l),first(l),numb(l)
+         do ioct=first(l),first(l)+numb(l)-2
+            !!print*,ioct,first(l),numb(l)
+            next(ioct) = ioct+1
+         enddo
+         last(l) = first(l)+numb(l)-1
+      enddo
+
+      do l=1,refine_lmax
+         if (first(l)>0) then 
+            inewoct=first(l)+numb(l)
+         end if
+      enddo
+
+      print*,minval(octlevel),maxval(octlevel)
+      
+      do l=refine_lmax,1,-1
+         ioct=head(l)
+         print*,l,ioct
+         do while(ioct>0)
+            do ind=1,8
+               icell=ncoarse+(ind-1)*noctmax+ioct
+               !print*,ind,ioct,icell,son(icell),size(son)
+               if(son(icell)>0)cycle
+               !print*,ind,ioct,icell,son(icell)
+               ! cell properties
+               level=octlevel(ioct)
+               !print*,l,level
+               dx=0.5d0**(level)
+               xc(1:3) = xoct(ioct,1:3) + offset(1:3,ind)*dx
+               do i=1,3 ! loop over the 3/6 neighbors outside the oct
+                  ! compute the position of an hypothetical neighbouring cell at the same level
+                  xv(1:3) = xc(1:3)
+                  xv(i) = xc(i) + offset(i,ind)*dx*2.0d0
+                  ! find the cell containing this point
+                  icellv = in_cell_finder_womesh(ncoarse,noctmax,ncellmax,son,xoct,xv)    !==> in_cell_finder works only for a mesh sructure!!!
+                  ! and the oct containing this cell
+                  indv = (icellv - ncoarse - 1) / noctmax + 1
+                  ioctv = icellv - ncoarse - (indv-1) * noctmax
+                  lv = octlevel(ioctv)
+                  !print*,'lv =',lv,l
+                  do while(l>lv+1)
+                     ! create a new oct at level lv+1
+                     !print*,'create a new oct at level ',lv+1,' because there is a cell at level ',l
+                     son(icellv)=inewoct
+                     father(inewoct)=icellv
+                     next(last(lv+1))=inewoct
+                     last(lv+1)=inewoct
+                     xoct(inewoct,1:3) = xoct(ioctv,1:3) + offset(1:3,indv)*0.5d0**lv
+                     octlevel(inewoct)=lv+1
+                     ! new oct created, find the new cell icellv containing the point xv
+                     x  = xoct(inewoct,1:3)  ! oct position
+                     ix = merge(0,1,xv(1) < x(1)) 
+                     iy = merge(0,1,xv(2) < x(2))
+                     iz = merge(0,1,xv(3) < x(3))
+                     indn = ix + 2*iy + 4*iz ! between 0 and 7
+                     icellv = ncoarse + indn * noctmax + inewoct
+                     ! and update 
+                     indv=indn+1             ! between 1 and 8
+                     ioctv = inewoct
+                     inewoct=inewoct+1
+                     lv=lv+1
+                  enddo
+               enddo
+            enddo
+            ioct=next(ioct)
+         enddo
+      enddo
+
+      print*,'nocttrue =',inewoct-1
+     ! compute noct
+      nocttrue=1
+      do l=1,refine_lmax
+         ioct=head(l)
+         do while(ioct>0)
+            do ind=1,8
+               icell=ncoarse+(ind-1)*noctmax+ioct
+               if(son(icell)>0)then
+                  nocttrue=nocttrue+1
+               endif
+            enddo
+            ioct=next(ioct)
+         enddo
+      enddo
+      print*,'nocttrue =',nocttrue
+      
+      ! compute leaf cells properties
+      !JB- We should only define leaf cells (with son(ileaf)=-ileaf) leaf cells that are in the domain.
+      ! Other leaves should be left with son==0... (which is used as a test for domain exit).
+      ileaf=1
+      do l=1,refine_lmax
+         ioct=head(l)
+         do while(ioct>0)
+            do ind=1,8
+               icell=ncoarse+(ind-1)*noctmax+ioct
+               if(son(icell)==0)then
+                  ! cell properties
+                  level=octlevel(ioct)
+                  dx=0.5d0**(level)
+                  xc(1:3) = xoct(ioct,1:3) + offset(1:3,ind)*dx
+                  if (domain_contains_cell(xc,dx,dom)) then ! The leaf cell is actually in the domain
+                     son(icell)=-ileaf
+                     ileaf=ileaf+1
+                  end if
+               endif
+            enddo
+            ioct=next(ioct)
+         enddo
+      enddo
+      nleaf=ileaf-1
+
+      print*,'nleaf =',nleaf
+
+      allocate(pos_leaf(nleaf,3),level_leaf(nleaf))
+      ileaf=1
+      do l=1,refine_lmax
+         ioct=head(l)
+         do while(ioct>0)
+            do ind=1,8
+               icell=ncoarse+(ind-1)*noctmax+ioct
+               if(son(icell)<0)then
+                  ! cell properties
+                  level=octlevel(ioct)
+                  dx=0.5d0**(level)
+                  xc(1:3) = xoct(ioct,1:3) + offset(1:3,ind)*dx
+                  pos_leaf(ileaf,1:3)=xc(1:3)
+                  level_leaf(ileaf)=level
+                  ileaf=ileaf+1
+               endif
+            enddo
+            ioct=next(ioct)
+         enddo
+      enddo
+
+      call  gas_from_idealised_model(nleaf, g, pos_leaf, level_leaf)
+      print*,nleaf
+      print*,minval(pos_leaf),maxval(pos_leaf)
+      print*,minval(level_leaf),maxval(level_leaf)
+      
+
+      
+      ! is it possible to resize (shrink) arrays now?
+      ! resize arrays
+      call resize_octtree(int(nOctmax,8),nOctTrue)
+      nOct  = nOctTrue
+      nCell = nCoarse + 8*nOct
+
+      if (verbose) then 
+         write(*,*) ' nCoarse = ',nCoarse
+         write(*,*) ' nOct    = ',nOct
+         write(*,*) ' nLeaf   = ',nLeaf
+         write(*,*) ' nCell   = ',nCell
+      end if
+      
+      
+      ! make nbor array
+      if (verbose) then 
+         !write(*,*)
+         write(*,*)'Building nbor array...'
+      end if
+      allocate(nbor(nOct,6))
+      nbor = 0
+      call make_nbor_array
+
+      ! work should be done
+      ! == son, father, xoct, octlevel should be filled
+      !if (countleaf /= nleaves) then
+      !   write(*,*)'mesh_from_leaves: number of leaves counted vs. init =',countleaf,nleaves
+      !   stop
+      !end if
+      ! do some checks if you want
+      !print*,ncell,nleaf,noct
+      !ncell = ncellmax ! global variabeuuuuh
+      !noct = noctmax
+      print*,ncell,nleaf,noct
+      allocate(xleaf(nleaf,3))
+      xleaf = pos_leaf
+      call check_octtree
+
+
+      ! fill the mesh type structure
+      allocate(shem%son(ncell),shem%father(noct),shem%octlevel(noct),shem%xoct(noct,3),shem%nbor(noct,6))
+
+      ! allocate & fill shem%domain%stuff
+
+      shem%domain = dom
+
+      shem%ncoarse = ncoarse
+      shem%noct    = int(noct,4)
+      shem%ncell   = int(ncell,4)
+      shem%nleaf   = nleaf
+
+      shem%son = son
+      shem%father = father
+      shem%octlevel = octlevel
+      shem%xoct = xoct
+      shem%nbor = nbor
+
+      ! allocate & fill m%gas
+      allocate(shem%gas(nleaf))
+      shem%gas = g
+      
+      ! check code
+      allocate(indleaf(1:nleaf))
+      do i=1,nleaf
+         indleaf(i)=i
+      enddo
+      call check_struct(nleaf,indleaf,shem)
+      ! clean-up
+      ! deallocate arrays
+      deallocate(father,son,nbor,octlevel,xoct)
+      deallocate(xleaf)
+
+      
+      return
+    end subroutine mesh_from_model
 
 
     !===============================================================================================
@@ -941,7 +1258,7 @@ module module_mesh
       enddo
       if (icount2 /= 0) then
          write(*,*)'check_octtree: problem with son array -> # of empty oct = ',icount2
-         stop
+         !stop
       endif
 
       ! father array
@@ -986,6 +1303,139 @@ module module_mesh
 
     end subroutine check_struct
 
+
+
+    function refine(x,level,lmax)
+      ! return true if a cell should be refined according to refinement criteria for AMR models
+      ! probe positions of (hypothetical) cells level by level till lmax
+      ! position of the centre of the cell in box unit
+
+      real(kind=8),dimension(3),intent(in) :: x
+      integer(kind=4),intent(in)           :: level
+      integer(kind=4),intent(in)           :: lmax
+      logical                              :: refine
+      real(kind=8)                         :: rho,rho2,vnorm,vnorm2,delta_d,delta_v,dopvel
+      real(kind=8),dimension(3)            :: xx,vel,vel2
+      integer(kind=4)                      :: np
+      integer(kind=4)                      :: ic,jc,kc,ifirst,jfirst,kfirst,itest,jtest,ktest,i,j,k,ltest
+      real(kind=8)                         :: floor_d,floor_v
+      real(kind=8)                         :: dx,rhomin,rhomax,vmin,vmax,dopvel_min
+      
+      floor_d = 1.d-30
+      floor_v = 1.d-30
+      
+      ! call im_get_props(x,rho,vel)
+      vel(:) = idealised_model_get_velocity(x)
+      rho    = idealised_model_get_scatterer_density(x)
+      
+      vnorm=sqrt(vel(1)**2+vel(2)**2+vel(3)**2)
+      ! JB- refine on momentum to avoid refining in voids (where the v-field is defined but the density is zero).
+      if (rho > 0.0d0) then 
+         vmin = vnorm
+         vmax = vnorm
+      else
+         vmax = - huge(1.0d0)
+         vmin = huge(1.0d0)
+      end if
+      rhomin = rho
+      rhomax = rho
+      ! get doppler velocity dopvel = sqrt(vth^2 + vturb^2)
+      !call im_get_vth(vth) ! i put this here but if vth was a function of position it should be somewhere below... 
+      dopvel = gas_get_dopvel(x)
+      dopvel_min = dopvel
+      
+      refine=.false.
+      ltest=level
+      
+      ! compute indices of incoming cell given its position
+      ic = min(int(x(1)*2**level)+1,2**level)
+      jc = min(int(x(2)*2**level)+1,2**level)
+      kc = min(int(x(3)*2**level)+1,2**level)
+
+      do while(.not.refine .and. ltest<lmax)
+         ! probe density gradients at each cell center from regular grid at each level until lmax
+         ltest=ltest+1
+         np=2**(ltest-level)
+         ifirst=(ic-1)*np
+         jfirst=(jc-1)*np
+         kfirst=(kc-1)*np
+         ! JB-
+         dx = 1.0d0/2.0d0**ltest
+         ! -JB
+
+         looping: do i=1,np     !! JB - add exit condition to loops on i,j,k
+            do j=1,np  !! JB - and use min/max values of quantities to compute deltas. 
+               do k=1,np
+                  itest=ifirst+i
+                  jtest=jfirst+j
+                  ktest=kfirst+k
+                  xx(1)=(itest-0.5)*dx
+                  xx(2)=(jtest-0.5)*dx
+                  xx(3)=(ktest-0.5)*dx
+                  !call im_get_props(xx,rho2,vel2)
+                  vel2(:) = idealised_model_get_velocity(xx)
+                  rho2 = idealised_model_get_scatterer_density(xx)
+                  ! recompute vth local here
+                  ! and take the min
+                  if (rho2 > rhomax) rhomax = rho2
+                  if (rho2 < rhomin) rhomin = rho2
+                  ! RAMSES formulation
+                  if(refine_err_grad_d>=0.) then
+                     delta_d = (rhomax-rhomin)/(rhomax+rhomin+floor_d)    !! JB - delta_d -> 1 when rho>>rho2 or rho2>>rho... 
+                     refine = refine .or. delta_d>=refine_err_grad_d
+                  endif
+                  if( (refine_err_grad_v>=0. .or. refine_dv_over_vth) .and. rho2 > 0.0d0 )then  ! JB: only test if there is gas 
+                     vnorm2=sqrt(vel2(1)**2+vel2(2)**2+vel2(3)**2)
+                     if (vnorm2 > vmax) vmax = vnorm2
+                     if (vnorm2 < vmin) vmin = vnorm2
+                     delta_v = (vmax-vmin)
+                     if (refine_dv_over_vth)then
+                        dopvel = gas_get_dopvel(xx)
+                        dopvel_min = min(dopvel,dopvel_min)
+                        refine = refine .or. delta_v>dopvel_min
+                     endif
+                     delta_v = delta_v / (vmax+vmin+floor_v)
+                     if (refine_err_grad_v>=0) refine = refine .or. delta_v>refine_err_grad_v
+                  endif
+                  ! JB - 
+                  if (refine) exit looping
+               enddo
+            enddo
+         enddo looping
+      enddo
+         
+      return
+    end function refine
+
+    
+
+    function in_cell_finder_womesh(ncoarse,noct,ncell,son,xoct,xp)
+
+      integer,intent(in)                          :: noct,ncoarse,ncell
+      integer(kind=4),dimension(ncell),intent(in) :: son
+      real(kind=8),dimension(noct,3),intent(in)   :: xoct
+      real(kind=8),dimension(3),intent(in)        :: xp
+      integer(kind=4)                             :: in_cell_finder_womesh
+      integer(kind=4)                             :: ison,ix,iy,iz,ind,icell
+      real(kind=8),dimension(3)                   :: x
+
+      ! find leaf cell containing point xp
+      icell = 1 ! the coarse cell containing the whole box is always nb 1
+      ison  = son(icell) ! its (oct) son
+      do while (ison > 0)  ! there is an oct in current cell 
+         x  = xoct(ison,1:3)  ! oct position
+         ix = merge(0,1,xp(1) < x(1)) 
+         iy = merge(0,1,xp(2) < x(2))
+         iz = merge(0,1,xp(3) < x(3))
+         ind = ix + 2*iy + 4*iz
+         icell = ncoarse + ind * nOct + ison
+         ison  = son(icell)
+      end do
+      in_cell_finder_womesh=icell
+
+      return
+    end function in_cell_finder_womesh
+
     
 
   subroutine read_mesh_params(pfile)
@@ -1028,6 +1478,14 @@ module module_mesh
           select case (trim(name))
           case ('verbose')
              read(value,*) verbose
+          case('refine_lmax')
+             read(value,*) refine_lmax
+          case('refine_err_grad_d')
+             read(value,*) refine_err_grad_d
+          case('refine_err_grad_v')
+             read(value,*) refine_err_grad_v
+          case('refine_dv_over_vth')
+             read(value,*) refine_dv_over_vth
           end select
        end do
     end if
@@ -1052,12 +1510,20 @@ module module_mesh
 
     if (present(unit)) then 
        write(unit,'(a,a,a)') '[mesh]'
-       write(unit,'(a,L1)')  '  verbose    = ',verbose
+       write(unit,'(a,L1)')     '  verbose            = ',verbose
+       write(unit,'(a,i5)')     '  refine_lmax        = ',refine_lmax
+       write(unit,'(a,ES10.3)') '  refine_err_grad_d  = ',refine_err_grad_d
+       write(unit,'(a,ES10.3)') '  refine_err_grad_v  = ',refine_err_grad_v
+       write(unit,'(a,L1)')     '  refine_dv_over_vth = ',refine_dv_over_vth
        write(unit,'(a)')             ' '
        call print_gas_composition_params(unit)
     else
        write(*,'(a,a,a)') '[mesh]'
        write(*,'(a,L1)')  '  verbose    = ',verbose
+       write(*,'(a,i5)')     '  refine_lmax        = ',refine_lmax
+       write(*,'(a,ES10.3)') '  refine_err_grad_d  = ',refine_err_grad_d
+       write(*,'(a,ES10.3)') '  refine_err_grad_v  = ',refine_err_grad_v
+       write(*,'(a,L1)')     '  refine_dv_over_vth = ',refine_dv_over_vth
        write(*,'(a)')             ' '
        call print_gas_composition_params
     end if
