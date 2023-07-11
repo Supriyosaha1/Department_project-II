@@ -14,17 +14,23 @@ program PhotonsFromStars
   type(domain)             :: emission_domain
   character(2000)          :: parameter_file
   real(kind=8),allocatable :: star_pos(:,:),star_age(:),star_minit(:),star_vel(:,:),star_met(:)
-  integer(kind=4)          :: iran,i,nstars,narg
+  integer(kind=4)          :: i,nstars,narg
   real(kind=8)             :: scalar, r2, r3
   ! for analysis purposes (a posteriori weighting) we want to save the emitter-frame
   ! frequency (here the freq. in the emitting stellar particle's frame)
   real(kind=8),allocatable :: nu_star(:)
   real(kind=8)             :: total_flux
   type(SSPgrid)            :: NdotGrid
+  type(PWLgrid)            :: PowerLawGrid
+  integer(kind=4),allocatable :: PWL_i1(:),PWL_j1(:)
+  real(kind=8),allocatable    :: PWL_wx1(:),PWL_wy1(:)
+  integer(kind=4)             :: i1,j1
+  real(kind=8)                :: wy1,wx1,betaplus2,lminfit,lmaxfit
+  
   real(kind=8),allocatable :: low_prob(:), low_prob2(:), nu_em(:), Ndot(:), sweight(:), lbin(:)
   real(kind=8),allocatable :: x_em(:,:), k_em(:,:), NdotStar(:,:), v_em(:,:)
   integer(kind=4)          :: ilow, iphot, iseed, ilow2
-  real(kind=8)             :: lambda0, k(3), lambdamin, lambdamax, nu, spec_gauss_nu0, lambda_star, weight
+  real(kind=8)             :: lambda0, k(3), lambdamin, lambdamax, nu, spec_gauss_nu0, lambda_star, weight, F_0, beta
 
   real(kind=8)             :: start, finish, rate, intermed
   integer(kind=8)          :: c1,c2,cr,c3
@@ -64,8 +70,11 @@ program PhotonsFromStars
   real(kind=8)              :: spec_gauss_lambda0 = 1216.       ! central wavelength [A]
   real(kind=8)              :: spec_gauss_sigma_kms = 10.0      ! line width in velocity [km/s] -> read from file. 
   ! parameters for spec_type == 'PowLaw' : a power-law fit to continuum of each star particle, vs. its age and met.
-  real(kind=8)              :: spec_powlaw_lmin_Ang = 1120.     ! min wavelength to sample (should be in the range where fit was made ...)
+  real(kind=8)              :: spec_powlaw_lmin_Ang = 1120.     ! min wavelength to sample
   real(kind=8)              :: spec_powlaw_lmax_Ang = 1320.     ! max ...
+  real(kind=8)              :: spec_powlaw_Fitlmin_Ang = 1100.     ! min wavelength for the fit
+  real(kind=8)              :: spec_powlaw_Fitlmax_Ang = 1400.     ! max ...  
+  logical                   :: spec_powlaw_AbsorptionLineClipping = .True.  ! remove absorption lines from fit. 
   ! parameters for spec_type == 'Table'
   real(kind=8)              :: spec_table_lmin_Ang = 1120.      ! min wavelength to sample
   real(kind=8)              :: spec_table_lmax_Ang = 1320.      ! max ...
@@ -171,15 +180,77 @@ program PhotonsFromStars
   call init_ssp_lib(spec_SSPdir)
   select case(trim(spec_type))
   case('PowLaw')
-     print*,'Not implemented yet...'
-     stop
-     ! steps
-     ! 1/ linear fit -> get grid of (Fo,Beta) = f(age,met)
-     ! 2/ integrate this to get NdotGrid
-     ! 3/ age-Z interpolation to get NdotStar
-     ! 4/ draw emitting stars from the weights
-     ! 5/ draw frequency?
-     
+     print*,'> WARNING: Power-law continuum is beta version ... '
+     ! 1/ Compute power-law fits over wavelength range. Save that into PowerLawGrid
+     lambdamin = spec_powlaw_lmin_Ang
+     lambdamax = spec_powlaw_lmax_Ang
+     lminfit   = spec_powlaw_Fitlmin_Ang
+     lmaxfit   = spec_powlaw_Fitlmax_Ang
+     call ssp_lib_fit_powerlaw(lminfit,lmaxfit,lambdamin,lambdamax,spec_powlaw_AbsorptionLineClipping,PowerLawGrid) 
+     ! 2/ compute weight of each particle by interpolating powerlaw photon rates
+     nstars = size(star_age)
+     allocate(sweight(nstars))
+     allocate(PWL_i1(nstars),PWL_j1(nstars))
+     allocate(PWL_wx1(nstars),PWL_wy1(nstars))
+     do i = 1,nstars
+        call ssp_lib_interpolate_powerlaw(PowerLawGrid,star_age(i)/1.e3,log10(star_met(i)),weight,i1,j1,wy1,wx1)
+        sweight(i) = weight * star_minit(i) / msun
+        PWL_i1(i)=i1
+        PWL_j1(i)=j1
+        PWL_wx1(i)=wx1
+        PWL_wy1(i)=wy1
+     end do
+     ! 3/ prepare photon packets
+     allocate(x_em(1:3,1:nphotons), k_em(1:3,1:nphotons), nu_em(1:nphotons))
+     allocate(v_em(1:3,1:nphotons))
+     ! 4/ draw star particles from their photon rates
+     print*,'nstars=',nstars
+     call compute_cum_low_prob(nstars, sweight, low_prob, total_flux)
+     if (verbose) write(*,*) 'Total luminosity (nb of photons per second): ',total_flux
+     iseed = ranseed
+     do iphot = 1,nphotons
+        call binary_search(iseed, nstars, low_prob, ilow)        ! select a star
+        x_em(:,iphot) = star_pos(:,ilow) 
+        call isotropic_direction(k,iseed)
+        k_em(:,iphot) = k
+        v_em(:,iphot) = star_vel(:,ilow)  ! store velocity of the source, for peeling-off 
+        ! use interpolation results to select SSP
+        if (ran3(iseed) < PWL_wx1(ilow)) then
+           i1 = PWL_i1(ilow)
+        else
+           i1 = PWL_i1(ilow)+1
+        end if
+        if (ran3(iseed) < PWL_wy1(ilow)) then
+           j1 = PWL_j1(ilow)
+        else
+           j1 = PWL_j1(ilow)+1
+        end if
+        ! draw frequency: 
+        ! sample F_lbda = F_0 (lbda / lbda_0)**beta (in erg/s/A) ...
+        ! -> we actually want to sample the nb of photons : N_lbda = F_lbda * lbda / (hc) = F_0*lbda_0/(h*c) * (lbda/lbda_0)**(beta+1)
+        ! FOR BETA /= 2 : 
+        ! -> the probability of drawing a photon with l in [lbda_min;lbda] is:
+        !      P(<lbda) = (lbda**(2+beta) - lbda_min**(2+beta))/(lbda_max**(2+beta)-lbda_min**(2+beta))
+        ! -> and thus for a random number x in [0,1], we get
+        !      lbda = [ lbda_min**(2+beta) + x * ( lbda_max**(2+beta) - lbda_min**(2+beta) ) ]**(1/(2+beta))
+        ! FOR BETA == 2:
+        ! -> the probability of drawing a photon with l in [lbda_min;lbda] is:
+        !      P(<lbda) = log(lbda/lbda_min) / log(lbda_max/lbda_min)
+        ! -> and thus for a random number x in [0,1], we get
+        !      lbda = lbda_min * exp[ x * log(lbda_max/lbda_min)]
+        r2 = ran3(iseed)
+        if (PowerLawGrid%beta(i1,j1) == -2.0d0) then
+           nu = spec_powlaw_lmin_Ang * exp(r2 * log(spec_powlaw_lmax_Ang / spec_powlaw_lmin_Ang) ) ! this is lbda [A]
+           nu = clight / (nu*1e-8) ! this is freq. [Hz]           
+        else
+           betaplus2 = PowerLawGrid%beta(i1,j1) + 2.0d0
+           nu   = (spec_powlaw_lmin_Ang**betaplus2 + r2 * (spec_powlaw_lmax_Ang**betaplus2 - spec_powlaw_lmin_Ang**betaplus2))**(1./betaplus2) ! this is lbda [A]
+           nu   = clight / (nu*1e-8) ! this is freq. [Hz]
+        end if
+        ! compute frequency in external frame 
+        scalar = k(1)*star_vel(1,ilow) + k(2)*star_vel(2,ilow) + k(3)*star_vel(3,ilow)
+        nu_em(iphot)  = nu / (1d0 - scalar/clight)
+     end do
 !--------------------------------------------------------------------------------------
 !--------------------------------------------------------------------------------------
   case('Gauss')
@@ -221,8 +292,8 @@ program PhotonsFromStars
         call isotropic_direction(k,iseed)
         k_em(:,iphot) = k
         ! compute frequency in star frame using the Box-Muller method
-        r2 = ran3(iran)
-        r3 = ran3(iran)
+        r2 = ran3(iseed)
+        r3 = ran3(iseed)
         nu = sqrt(-2.*log(r2)) * cos(2.0d0*pi*r3)
         nu = (spec_gauss_sigma_kms * 1d5 * spec_gauss_nu0 / clight) * nu + spec_gauss_nu0
         nu_star(iphot) =  nu    ! clight / (lambda0*1e-8)  ! Hz
@@ -506,8 +577,10 @@ program PhotonsFromStars
   ! deallocations 
   ! --------------------------------------------------------------------------------------
   deallocate(star_pos,star_vel,star_minit,star_age,star_met)
-  deallocate(sweight, Ndot)
-  deallocate(nu_star, nu_em, x_em, k_em, v_em)
+  deallocate(sweight)
+  if (allocated(Ndot)) deallocate(Ndot)
+  deallocate(nu_em, x_em, k_em, v_em)
+  if (allocated(nu_star)) deallocate(nu_star)
   ! --------------------------------------------------------------------------------------
 
   call cpu_time(finish)
@@ -618,6 +691,12 @@ contains
              read(value,*) spec_powlaw_lmin_Ang
           case ('spec_powlaw_lmax_Ang')
              read(value,*) spec_powlaw_lmax_Ang
+          case ('spec_powlaw_Fitlmin_Ang')
+             read(value,*) spec_powlaw_Fitlmin_Ang
+          case ('spec_powlaw_Fitlmax_Ang')
+             read(value,*) spec_powlaw_Fitlmax_Ang
+          case ('spec_powlaw_AbsorptionLineClipping')
+             read(value,*) spec_powlaw_AbsorptionLineClipping
           case ('spec_table_lmin_Ang')
              read(value,*) spec_table_lmin_Ang
           case ('spec_table_lmax_Ang')
@@ -683,6 +762,9 @@ contains
        case('PowLaw')
           write(unit,'(a,es10.3,a)')     '  spec_powlaw_lmin_Ang    = ',spec_powlaw_lmin_Ang, ' ! [A]' 
           write(unit,'(a,es10.3,a)')     '  spec_powlaw_lmax_Ang    = ',spec_powlaw_lmax_Ang, ' ! [A]'
+          write(unit,'(a,es10.3,a)')     '  spec_powlaw_Fitlmin_Ang    = ',spec_powlaw_Fitlmin_Ang, ' ! [A]' 
+          write(unit,'(a,es10.3,a)')     '  spec_powlaw_Fitlmax_Ang    = ',spec_powlaw_Fitlmax_Ang, ' ! [A]'
+          write(unit,'(a,L1)')           '  spec_powlaw_AbsorptionLineClipping = ',spec_powlaw_AbsorptionLineClipping
        case('Table')
           write(unit,'(a,es10.3,a)')     '  spec_table_lmin_Ang    = ',spec_table_lmin_Ang, ' ! [A]' 
           write(unit,'(a,es10.3,a)')     '  spec_table_lmax_Ang    = ',spec_table_lmax_Ang, ' ! [A]'
@@ -727,6 +809,9 @@ contains
        case('PowLaw')
           write(*,'(a,es10.3,a)')     '  spec_powlaw_lmin_Ang    = ',spec_powlaw_lmin_Ang, ' ! [A]' 
           write(*,'(a,es10.3,a)')     '  spec_powlaw_lmax_Ang    = ',spec_powlaw_lmax_Ang, ' ! [A]'
+          write(*,'(a,es10.3,a)')     '  spec_powlaw_Fitlmin_Ang    = ',spec_powlaw_Fitlmin_Ang, ' ! [A]' 
+          write(*,'(a,es10.3,a)')     '  spec_powlaw_Fitlmax_Ang    = ',spec_powlaw_Fitlmax_Ang, ' ! [A]'
+          write(*,'(a,L1)')           '  spec_powlaw_AbsorptionLineClipping = ',spec_powlaw_AbsorptionLineClipping
        case('Table')
           write(*,'(a,es10.3,a)')     '  spec_table_lmin_Ang     = ',spec_table_lmin_Ang, ' ! [A]' 
           write(*,'(a,es10.3,a)')     '  spec_table_lmax_Ang     = ',spec_table_lmax_Ang, ' ! [A]'

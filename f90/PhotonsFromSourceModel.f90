@@ -15,6 +15,9 @@ program PhotonsFromSourceModel
   type(SSPgrid)                              :: NdotGrid
   real(kind=8),allocatable                   :: low_prob2(:), Ndot(:), lbin(:)
   real(kind=8)                               :: lambdamin, lambdamax, lambda_source, scalar, total_flux
+  type(PWLgrid)            :: PowerLawGrid
+  integer(kind=4)          :: i1,j1,iage,imet
+  real(kind=8)             :: wy1,wx1,lminfit,lmaxfit,weight
 
   ! --------------------------------------------------------------------------
   ! user-defined parameters - read from section [PhotonsFromSourceModel] of the parameter file
@@ -49,6 +52,13 @@ program PhotonsFromSourceModel
   real(kind=8)              :: spec_table_age   = 10.0          ! age of the stellar population to use [Myr]
   real(kind=8)              :: spec_table_met   = 0.02          ! metallicity of the stellar population to use
   real(kind=8)              :: spec_table_mass  = 1.e6          ! mass of the source [Msun]
+  ! parameters for spec_type == 'TablePowerLaw'                  ! use a power-law fit to SSP SEDs
+  ! this option also uses spec_SSPdir, spec_table_age, spec_table_met, spec_table_mass
+  real(kind=8)              :: spec_tpl_lmin_Ang = 1120.        ! min wavelength to sample
+  real(kind=8)              :: spec_tpl_lmax_Ang = 1320.        ! max ...
+  real(kind=8)              :: spec_tpl_Fitlmin_Ang = 1100.     ! min wavelength for the fit
+  real(kind=8)              :: spec_tpl_Fitlmax_Ang = 1500.     ! max ...
+  logical                   :: spec_tpl_AbsorptionLineClipping = .True.  ! remove absorption lines from fit. 
   ! --- miscelaneous
   integer(kind=4)           :: ranseed = 1234                   ! seed for random generator
   logical                   :: verbose = .true.
@@ -100,6 +110,24 @@ program PhotonsFromSourceModel
         lbin(i) = (NdotGrid%lambda(i+1) + NdotGrid%lambda(i))/2.0d0
      enddo
      lbin(NdotGrid%nlambda) = lambdamax
+
+  else if (trim(spec_type) == 'TablePowerLaw') then
+
+     call init_ssp_lib(spec_SSPdir)
+     print*,'> WARNING: Power-law continuum is beta version ... '
+     ! 1/ Compute power-law fits over wavelength range. Save that into PowerLawGrid
+     lambdamin = spec_tpl_lmin_Ang
+     lambdamax = spec_tpl_lmax_Ang
+     lminfit   = spec_tpl_Fitlmin_Ang
+     lmaxfit   = spec_tpl_Fitlmax_Ang
+     call ssp_lib_fit_powerlaw(lminfit,lmaxfit,lambdamin,lambdamax,spec_tpl_AbsorptionLineClipping,PowerLawGrid) 
+     if (verbose) then
+        write(*,*) 'Age and metallicity of the source: ',spec_table_age, spec_table_met
+        write(*,*) 'Mass of the source: ',spec_table_mass
+     endif
+     call ssp_lib_interpolate_powerlaw(PowerLawGrid,spec_table_age/1.e3, log10(spec_table_met),weight,i1,j1,wy1,wx1)
+     total_flux = weight * spec_table_mass ! nb of photons/s
+     if (verbose) write(*,'(a,1x,e10.2)') 'Total luminosity (nb of photons per second): ',total_flux
      
   end if
 
@@ -165,6 +193,30 @@ program PhotonsFromSourceModel
         
         nu = clight / (lambda_source*1e-8) ! Hz
 
+     case('TablePowerLaw')
+        
+        ! use interpolation results to select SSP
+        if (ran3(iseed) < wx1) then
+           iage = i1
+        else
+           iage = i1+1
+        end if
+        if (ran3(iseed) < wy1) then
+           imet = j1
+        else
+           imet = j1 + 1
+        end if
+        r2 = ran3(iseed)
+        if (PowerLawGrid%beta(iage,imet) == -2.0d0) then
+           nu = spec_tpl_lmin_Ang * exp(r2 * log(spec_tpl_lmax_Ang / spec_tpl_lmin_Ang) ) ! this is lbda [A]
+           nu = clight / (nu*1e-8) ! this is freq. [Hz]           
+        else
+           betaplus2 = PowerLawGrid%beta(iage,imet) + 2.0d0
+           nu   = (spec_tpl_lmin_Ang**betaplus2 + r2 * (spec_tpl_lmax_Ang**betaplus2 - spec_tpl_lmin_Ang**betaplus2))**(1./betaplus2) ! this is lbda [A]
+           nu   = clight / (nu*1e-8) ! this is freq. [Hz]
+        end if
+
+        
      case default
         print*,'ERROR: unknown spec_type :',trim(spec_type)
      end select
@@ -293,6 +345,16 @@ contains
              read(value,*) spec_table_met
           case ('spec_table_mass')
              read(value,*) spec_table_mass
+          case ('spec_tpl_lmin_Ang')
+             read(value,*) spec_tpl_lmin_Ang
+          case ('spec_tpl_lmax_Ang')
+             read(value,*) spec_tpl_lmax_Ang
+          case ('spec_tpl_Fitlmin_Ang')
+             read(value,*) spec_tpl_Fitlmin_Ang
+          case ('spec_tpl_Fitlmax_Ang')
+             read(value,*) spec_tpl_Fitlmax_Ang
+          case('spec_tpl_AbsorptionLineClipping')
+             read(value,*) spec_tpl_AbsorptionLineClipping
           case ('nPhotonPackets')
              read(value,*) nphotons
           end select
@@ -301,7 +363,6 @@ contains
     close(10)
 
     return
-
   end subroutine read_PhotonsFromSourceModel_params
 
 
@@ -316,13 +377,10 @@ contains
 
     if (present(unit)) then 
        write(unit,'(a,a,a)')          '[PhotonsFromSourceModel]'
-       write(unit,'(a)')              '# input / output parameters'
        write(unit,'(a,a)')            '  outputfile      = ',trim(outputfile)
-       write(unit,'(a)')              '# source type parameters'
        write(unit,'(a,a)')            '  source_type     = ',trim(source_type)
        write(unit,'(a,3(ES10.3,1x))') '  source_pos      = ',source_pos(1),source_pos(2),source_pos(3)
        write(unit,'(a,3(ES10.3,1x))') '  source_vel      = ',source_vel(1),source_vel(2),source_vel(3)
-       write(unit,'(a)')              '# how source shines'
        write(unit,'(a,i8)')           '  nPhotonPackets  = ',nphotons
        write(unit,'(a,a)')            '  spec_type       = ',trim(spec_type)
        select case(trim(spec_type))
@@ -342,6 +400,16 @@ contains
           write(unit,'(a,es10.3,a)')     '  spec_table_age       = ',spec_table_age, ' ! [Myr]'
           write(unit,'(a,es10.3)')       '  spec_table_met       = ',spec_table_met
           write(unit,'(a,es10.3,a)')     '  spec_table_mass      = ',spec_table_mass, ' ! [Msun]'
+       case('TablePowerLaw')
+          write(unit,'(a,a)')            '  spec_SSPdir          = ',trim(spec_SSPdir)
+          write(unit,'(a,es10.3,a)')     '  spec_tpl_lmin_Ang    = ',spec_tpl_lmin_Ang, ' ! [A]'
+          write(unit,'(a,es10.3,a)')     '  spec_tpl_lmax_Ang    = ',spec_tpl_lmax_Ang, ' ! [A]'
+          write(unit,'(a,es10.3,a)')     '  spec_tpl_Fitlmin_Ang = ',spec_tpl_Fitlmin_Ang, ' ! [A]'
+          write(unit,'(a,es10.3,a)')     '  spec_tpl_Fitlmax_Ang = ',spec_tpl_Fitlmax_Ang, ' ! [A]'
+          write(unit,'(a,es10.3,a)')     '  spec_table_age       = ',spec_table_age, ' ! [Myr]'
+          write(unit,'(a,es10.3)')       '  spec_table_met       = ',spec_table_met
+          write(unit,'(a,es10.3,a)')     '  spec_table_mass      = ',spec_table_mass, ' ! [Msun]'
+          write(unit,'(a,L1)')           '  spec_tpl_AbsorptionLineClipping =',spec_tpl_AbsorptionLineClipping
        case default
           print*,'ERROR: unknown spec_type :',trim(spec_type)
        end select
@@ -379,6 +447,16 @@ contains
           write(*,'(a,es10.3,a)')     '  spec_table_age       = ',spec_table_age, ' ! [Myr]'
           write(*,'(a,es10.3)')       '  spec_table_met       = ',spec_table_met
           write(*,'(a,es10.3,a)')     '  spec_table_mass      = ',spec_table_mass, ' ! [Msun]'
+       case('TablePowerLaw')
+          write(*,'(a,a)')            '  spec_SSPdir          = ',trim(spec_SSPdir)
+          write(*,'(a,es10.3,a)')     '  spec_tpl_lmin_Ang    = ',spec_tpl_lmin_Ang, ' ! [A]'
+          write(*,'(a,es10.3,a)')     '  spec_tpl_lmax_Ang    = ',spec_tpl_lmax_Ang, ' ! [A]'
+          write(*,'(a,es10.3,a)')     '  spec_tpl_Fitlmin_Ang = ',spec_tpl_Fitlmin_Ang, ' ! [A]'
+          write(*,'(a,es10.3,a)')     '  spec_tpl_Fitlmax_Ang = ',spec_tpl_Fitlmax_Ang, ' ! [A]'
+          write(*,'(a,es10.3,a)')     '  spec_table_age       = ',spec_table_age, ' ! [Myr]'
+          write(*,'(a,es10.3)')       '  spec_table_met       = ',spec_table_met
+          write(*,'(a,es10.3,a)')     '  spec_table_mass      = ',spec_table_mass, ' ! [Msun]'
+          write(*,'(a,L1)')           '  spec_tpl_AbsorptionLineClipping =',spec_tpl_AbsorptionLineClipping
        case default
           print*,'ERROR: unknown spec_type :',trim(spec_type)
        end select
