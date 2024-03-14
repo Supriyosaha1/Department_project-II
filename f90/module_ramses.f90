@@ -1,6 +1,6 @@
 module module_ramses
 
-  use module_constants, only : kB, mp, XH, planck, clight, cmtoA, lambda_LyA_Ang
+  use module_constants, only : kB, mp, XH, planck, clight, cmtoA, lambda_LyA_Ang, lambda_Ha_Ang
   use module_domain
   use coolrates_module
   
@@ -1769,20 +1769,20 @@ contains
   end subroutine ramses_get_LyaEmiss_HIDopwidth
 
 
-  subroutine ramses_get_HaEmiss_HIDopwidth(repository,snapnum,nleaf,nvar,var,conv_factor,HaEm,HIDopwidth,sample)
+  subroutine ramses_get_HaEmiss_HIDopwidth(repository,snapnum,nleaf,nvar,var,recomb_em,coll_em,HIDopwidth,sample)
 
     implicit none
 
-    character(1000),intent(in)  :: repository
-    integer(kind=4),intent(in)  :: snapnum
+    character(1000),intent(in) :: repository
+    integer(kind=4),intent(in) :: snapnum
     integer(kind=4),intent(in) :: nleaf,nvar
-    real(kind=8),intent(in)    :: var(nvar,nleaf), conv_factor   ! "conv_factor" is the conversion factor from the LyA to the line we want.
-    real(kind=8),intent(inout) :: HaEm(:),HIDopwidth(:)
+    real(kind=8),intent(in)    :: var(nvar,nleaf)
+    real(kind=8),intent(inout) :: recomb_em(:),coll_em(:),HIDopwidth(:)
     integer(kind=4),intent(in),optional :: sample(:)
 
     integer(kind=4)            :: n,j,i
-    real(kind=8),parameter     :: e_lya = planck * clight / (lambda_LyA_Ang/cmtoA) ! [erg] energy of a Lya photon (consistent with HI_model)
-    real(kind=8)               :: xhii,xheii,xheiii,nh,nhi,nhii,n_e,mu,TK,Ta,prob_case_B,alpha_B,lambda,nhe,LyaEm
+    real(kind=8),parameter     :: e_ha = planck * clight / (lambda_Ha_Ang/cmtoA) ! [erg] energy of a Lya photon (consistent with HI_model)
+    real(kind=8)               :: xhii,xheii,xheiii,nh,nhi,nhii,n_e,mu,TK,Ta,prob_case_B,alpha_B,lambda,nhe,coeff_em,coeff_col
     logical                    :: subsample
     
     ! get conversion factors if necessary
@@ -1818,17 +1818,15 @@ contains
           n_e    = nHII + nHe * (xHeII + 2.0d0*xHeIII)
           mu     = 1./( XH*(1.+xHII) + 0.25d0*(1.0d0-XH)*(1.+xHeII+2.*xHeIII) )
           TK     = var(itemp,i)/var(1,i)*mu*dp_scale_T2
+
           HIDopwidth(j) = sqrt((2.0d0*kb/mp)*TK)
-          ! Cantalupo+(08)
-          Ta = max(TK,100.0) ! no extrapolation..
-          prob_case_B = 0.686 - 0.106*log10(Ta/1e4) - 0.009*(Ta/1e4)**(-0.44)
-          ! Hui & Gnedin (1997)
-          lambda = 315614.d0/TK
-          alpha_B = 2.753d-14*(lambda**(1.5))/(1+(lambda/2.74)**0.407)**(2.242) ![cm3/s]
-          LyaEm = prob_case_B * alpha_B * n_e * nhii * e_lya ! [erg/cm3/s]
-          ! convert Lya to Ha using a simple ratio ... 
-          HaEm(j) = LyaEm / conv_factor
-          
+          ! Pequignot et al. (1991)
+          coeff_em = 1e-13*(2.708*(TK*1e-4)**(-0.648))/(1+1.315*(TK*1e-4)**0.523)
+          recomb_em(j)=  coeff_em * n_e * nhii * e_ha ! [erg/cm3/s]
+          ! Katz et al. (2021)
+          coeff_col = (5.01d-19/TK**0.230) * exp(-8.13d4/TK**0.938)
+          coll_em(j) = nhi * n_e * coeff_col ! [erg/s/cm3]
+
        end do
     else
        print*,'Not implemented ... '

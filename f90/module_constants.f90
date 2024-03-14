@@ -21,6 +21,7 @@ module module_constants
   real(kind=8),parameter :: mpc            = 3.08d24                 ![cm] from Mpc to cm
   real(kind=8),parameter :: msun           = 1.989d33                ![g] solar mass 
   real(kind=8),parameter :: lambda_LyA_Ang = 1215.67d0               ![A] wavelength of LyA line
+  real(kind=8),parameter :: lambda_Ha_Ang  = 6562.8d0                ![A] wavelength of Halpha line
 
 end module module_constants
 

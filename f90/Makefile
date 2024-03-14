@@ -75,9 +75,9 @@ OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
 
 #############################################################################
 ifeq ($(MPI),1)
-all: clean GenerateAMRmodel CreateDomDump PhotonsFromStars LyaPhotonsFromGas PhotonsFromSourceModel rascas rascas-serial
+all: clean GenerateAMRmodel CreateDomDump PhotonsFromStars LyaPhotonsFromGas HaPhotonsFromGas PhotonsFromSourceModel rascas rascas-serial
 else
-all: clean GenerateAMRmodel CreateDomDump PhotonsFromStars LyaPhotonsFromGas PhotonsFromSourceModel rascas-serial
+all: clean GenerateAMRmodel CreateDomDump PhotonsFromStars LyaPhotonsFromGas HaPhotonsFromGas PhotonsFromSourceModel rascas-serial
 endif
 
 PhotonsFromSourceModel: $(OBJSPHO) PhotonsFromSourceModel.o
@@ -88,6 +88,9 @@ PhotonsFromStars: $(OBJSPHO) PhotonsFromStars.o
 
 LyaPhotonsFromGas: $(OBJSBASE)  LyaPhotonsFromGas.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSBASE) LyaPhotonsFromGas.o
+
+HaPhotonsFromGas: $(OBJSBASE)  HaPhotonsFromGas.o
+	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSBASE) HaPhotonsFromGas.o
 
 CreateDomDump: $(OBJSDOM) CreateDomDump.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSDOM) CreateDomDump.o
