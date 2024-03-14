@@ -1516,7 +1516,9 @@ contains
 !!$       end if
        call read_int( ilun, 'nGroups', nGroups)
        allocate(group_egy(nGroups),group_csn(ngroups,nions),group_cse(ngroups,nions))
+       print*,'so far so good'
        call read_real(ilun, 'unit_pf', unit_fp)
+       print*,'stil ...'
        call read_groups(ilun)
        close(ilun)
     end if
@@ -1629,23 +1631,31 @@ contains
     !XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     SUBROUTINE read_real(lun, param_name, value)
 
-      ! Try to read a parameter from lun
+      ! Try to read a parameter from lun ... format-resilient implementation... 
       !-------------------------------------------------------------------------
       integer::lun
       character(*)::param_name
-      character(1000)::line,tmp
+      character(1000)::line,tmp,tmpv
       real(kind=8)::value
       !-------------------------------------------------------------------------
       rewind(unit=lun)
       do
          read(lun, '(A128)', end=222) line
-         if(index(line,trim(param_name)) .eq. 1) then
-            read(line,'(A13,E23.15)') tmp, value
-            return
-         endif
+
+         i = scan(line,'=')
+         if (i==0 .or. line(1:1)=='#' .or. line(1:1)=='!') cycle  ! skip blank or commented lines
+         tmp   = trim(adjustl(line(:i-1)))
+         tmpv  = trim(adjustl(line(i+1:)))
+         if (trim(tmp) == trim(param_name)) then
+            read(tmpv,*) value
+            return 
+         end if
+!!$         if(index(line,trim(param_name)) .eq. 1) then
+!!$            read(line,'(A13,E23.15)') tmp, value
+!!$            return
+!!$         endif
       end do
 222   return                        ! eof reached, didn't find the parameter
-
     END SUBROUTINE read_real
     !XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     SUBROUTINE read_groups(lun)
