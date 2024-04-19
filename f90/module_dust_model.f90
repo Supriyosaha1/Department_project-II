@@ -5,6 +5,9 @@ module module_dust_model
   use module_random
   use module_constants, only : pi, clight
   use module_utils, only : anisotropic_direction_Dust
+  !--PEEL--
+  use module_utils, only : anisotropic_probability_dust
+  !--LEEP--
 
   implicit none
 
@@ -17,9 +20,14 @@ module module_dust_model
   real(kind=8)  :: g_dust     = 0.73    ! g parameter of the Henyey-Greenstein phase function for dust scattering [default 0.73 from Li & Draine 2001]
   character(20) :: dust_model = 'SMC' 
   ! --------------------------------------------------------------------------
-  
-  public get_tau_dust, scatter_dust, read_dust_params, print_dust_params
-  private sigma_d
+
+  integer(kind=4) :: dustKey
+
+  public :: get_tau_dust, scatter_dust, read_dust_params, print_dust_params
+  private :: sigma_d
+  !--PEEL--
+  public :: dust_peeloff_weight
+  !--LEEP--
   
 contains
 
@@ -41,7 +49,7 @@ contains
     real(kind=8)            :: get_tau_dust,lbda_A
     
     lbda_A = clight/nu*1d8
-    get_tau_dust = sigma_d(lbda_A,dust_model) * ndust * distance
+    get_tau_dust = sigma_d(lbda_A) * ndust * distance
     
     return
 
@@ -97,6 +105,41 @@ contains
 
 
 
+  !--PEEL--
+  function dust_peeloff_weight(vcell,nu_ext,kin,kout)
+
+    ! ---------------------------------------------------------------------------------
+    ! Compute probability that a photon coming along kin scatters off in direction kout.
+    ! Also update nu_ext to external-frame frequency along kout
+    ! ---------------------------------------------------------------------------------
+    ! INPUTS :
+    ! - vcell    : bulk velocity of the gas (i.e. cell velocity)       [ cm / s ] 
+    ! - nu_ext   : frequency of incoming photon, in external frame     [ Hz ]
+    ! - kin      : propagation vector (normalized)
+    ! - kout     : direction after interaction (fixed)
+    ! OUTPUTS :
+    ! - nu_ext   : updated frequency in external frame [ Hz ]
+    ! ---------------------------------------------------------------------------------
+
+    real(kind=8),intent(inout)              :: nu_ext
+    real(kind=8),dimension(3),intent(in)    :: kin, kout
+    real(kind=8),dimension(3),intent(in)    :: vcell
+    real(kind=8)                            :: dust_peeloff_weight
+    real(kind=8)                            :: scalar,nu_cell
+
+    dust_peeloff_weight = anisotropic_probability_Dust(kin,kout,g_dust) * albedo
+    ! compute freq. in cell frame
+    scalar  = kin(1) * vcell(1) + kin(2) * vcell(2) + kin(3) * vcell(3)
+    nu_cell = (1.d0 - scalar/clight) * nu_ext
+    ! nu_cell has not changed; we implicitly assume that the interacting dust grain is at rest in cell's frame
+    scalar = kout(1) * vcell(1) + kout(2) * vcell(2) + kout(3)* vcell(3)
+    nu_ext = nu_cell/(1.d0 - scalar/clight)
+
+  end function dust_peeloff_weight
+  !--LEEP--
+
+
+
   subroutine read_dust_params(pfile)
 
     ! ---------------------------------------------------------------------------------
@@ -145,6 +188,17 @@ contains
     end if
     close(10)
 
+    ! encode model choice into an integer
+    select case(trim(dust_model))
+    case('SMC')
+       dustKey = 1
+    case('LMC')
+       dustKey = 2
+    case default
+       print*,'ERROR: dust model not known in module_dust.f90: read_dust_params: ',trim(dust_model)
+       stop
+    end select
+    
     return
 
   end subroutine read_dust_params
@@ -177,7 +231,7 @@ contains
   end subroutine print_dust_params
 
   
-  function sigma_d(lbda,model)
+  function sigma_d(lbda)
 
     ! returns the effective cross section of dust (per H atom), in cgs, at wavelength lbda (in A),
     ! for a given model. NB: this is the total cross section (including abs. and scat. probs). 
@@ -186,7 +240,6 @@ contains
     implicit none 
 
     real(kind=8),intent(in)  :: lbda
-    character(20),intent(in) :: model
     real(kind=8)             :: sigma_d,x
     integer(kind=4)          :: i
     ! SMC parameters
@@ -205,21 +258,21 @@ contains
     real(kind=8),parameter              :: lmc_sig0 = 3.0d-22  ! [cm^-2]
 
     sigma_d = 0.0d0
-    select case(trim(model))
-    case('SMC')
+    select case(dustKey)
+    case(1)   ! 'SMC'
        do i = 1,7
           x = lbda / smc_lbda(i)
           sigma_d = sigma_d + smc_a(i) / (x**smc_p(i) + x**(-smc_q(i)) + smc_b(i))
        end do
        sigma_d = sigma_d * smc_sig0
-    case('LMC')
+    case(2)   ! 'LMC'
        do i = 1,7
           x = lbda / lmc_lbda(i)
           sigma_d = sigma_d + lmc_a(i) / (x**lmc_p(i) + x**(-lmc_q(i)) + lmc_b(i))
        end do
        sigma_d = sigma_d * lmc_sig0
     case default
-       print*,'dust model unknown',trim(model)
+       print*,'dust model unknown: ',dustKey,trim(dust_model)
        stop
     end select
 

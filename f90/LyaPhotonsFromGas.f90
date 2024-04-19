@@ -5,7 +5,6 @@ program LyaPhotonsFromGas
   use module_random
   use module_constants
   use module_utils
-  use module_HI_1216_model, only: lambda_0, lambda_0_cm, nu_0
   
   implicit none
 
@@ -18,12 +17,12 @@ program LyaPhotonsFromGas
   real(kind=8)                 :: r1, r2, dx, dv, nu, scalar, recomb_total,coll_total,k(3), boxsize,maxrec,maxcol
   real(kind=8)                 :: start_photpacket,end_photpacket,x(3),dt,xmin,xmax,ymin,ymax,zmin,zmax
   logical                      :: ok
-  real(kind=8),allocatable     :: nu_em(:),x_em(:,:),k_em(:,:),nu_cell(:)
+  real(kind=8),allocatable     :: nu_em(:),x_em(:,:),k_em(:,:),nu_cell(:),v_em(:,:)
   integer(kind=4),allocatable  :: cpu_list(:)
   integer(kind=4)              :: ncpu_read
   real(kind=8),allocatable     :: low_prob_rec(:),low_prob_col(:)
   integer(kind=4)              :: ilow,iup,imid
-  real(kind=8)                 :: mid
+  real(kind=8)                 :: mid, nu_LyA
 
   ! ---------------------------------------------------------------------------
   ! user-defined parameters - read from section [LyaPhotonsFromGas] of the parameter file
@@ -92,7 +91,7 @@ program LyaPhotonsFromGas
   ! define max extent of emission domain 
   call domain_get_bounding_box(emission_domain,xmin,xmax,ymin,ymax,zmin,zmax)
   call get_cpu_list_periodic(repository, snapnum, xmin,xmax,ymin,ymax,zmin,zmax, ncpu_read, cpu_list)
-  call ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level)
+  call ramses_get_leaf_cells(repository, snapnum, ncpu_read, cpu_list, nleaftot, nvar, x_leaf, ramses_var, leaf_level, 0)
   if (verbose) print*,'done reading'
   call select_cells_in_domain(emission_domain,nleaftot,x_leaf,leaf_level,emitting_cells)
   nsel = size(emitting_cells)
@@ -127,10 +126,11 @@ program LyaPhotonsFromGas
      if (coll_em(i) > maxcol) maxcol = coll_em(i) 
   end do
   
-  recomb_total = sum(recomb_em) / (planck*nu_0)  ! nb of photons per second
-  coll_total   = sum(coll_em) / (planck*nu_0)  ! nb of photons per second
+  nu_LyA = clight / lambda_LyA_Ang * cmtoA
+  recomb_total = sum(recomb_em) / (planck*nu_LyA)  ! nb of photons per second
+  coll_total   = sum(coll_em) / (planck*nu_LyA)  ! nb of photons per second
   
-  print*,'coll_total,recomb_total [erg/s] = ',coll_total*(planck*nu_0),recomb_total*(planck*nu_0)
+  print*,'coll_total,recomb_total [erg/s] = ',coll_total*(planck*nu_LyA),recomb_total*(planck*nu_LyA)
   
   recomb_em = recomb_em / maxrec
   coll_em   = coll_em / maxcol
@@ -159,7 +159,7 @@ program LyaPhotonsFromGas
   deallocate(ramses_var)
   ! ----------------------------------------------------------------------------
   
-  allocate(nu_em(nphotons),x_em(3,nphotons),k_em(3,nphotons),nu_cell(nphotons))
+  allocate(nu_em(nphotons),x_em(3,nphotons),k_em(3,nphotons),nu_cell(nphotons),v_em(3,nphotons))
   
   ! --------------------------------------------------------------------------------------
   if (doRecombs) then 
@@ -207,10 +207,12 @@ program LyaPhotonsFromGas
               r1 = ran3(iseed)
               r2 = ran3(iseed)
               nu = sqrt(-2.*log(r1)) * cos(2.0d0*pi*r2)
-              nu_cell(iphot) = (HIDopWidth(ilow) * nu_0 / clight) * nu + nu_0
+              nu_cell(iphot) = (HIDopWidth(ilow) * nu_LyA / clight) * nu + nu_LyA
               ! compute frequency in exteral frame 
               scalar = k(1)*v_leaf(1,j) + k(2)*v_leaf(2,j) + k(3)*v_leaf(3,j)
               nu_em(iphot)  = nu_cell(iphot) / (1d0 - scalar/clight)
+              ! store velocity of the emitting cell, for peeling-off only
+              v_em(:,iphot) = v_leaf(:,j)
               ok = .true.
            end if
         end do
@@ -227,7 +229,7 @@ program LyaPhotonsFromGas
      write(14) (x_em(:,i),i=1,nphotons)
      write(14) (k_em(:,i),i=1,nphotons)
      write(14) (-i,i=1,nphotons) ! seeds
-     write(14) (nu_cell(i),i=1,nphotons)
+     write(14) (v_em(:,i),i=1,nphotons)
      close(14)
      ! --------------------------------------------------------------------------------------
      if (verbose) then 
@@ -285,10 +287,12 @@ program LyaPhotonsFromGas
               r1 = ran3(iseed)
               r2 = ran3(iseed)
               nu = sqrt(-2.*log(r1)) * cos(2.0d0*pi*r2)
-              nu_cell(iphot) = (HIDopWidth(ilow) * nu_0 / clight) * nu + nu_0
+              nu_cell(iphot) = (HIDopWidth(ilow) * nu_LyA / clight) * nu + nu_LyA
               ! compute frequency in exteral frame 
               scalar = k(1)*v_leaf(1,j) + k(2)*v_leaf(2,j) + k(3)*v_leaf(3,j)
               nu_em(iphot)  = nu_cell(iphot) / (1d0 - scalar/clight)
+              ! store velocity of the emitting cell, for peeling-off only
+              v_em(:,iphot) = v_leaf(:,j)
               ok = .true.
            end if
         end do
@@ -305,7 +309,7 @@ program LyaPhotonsFromGas
      write(14) (x_em(:,i),i=1,nphotons)
      write(14) (k_em(:,i),i=1,nphotons)
      write(14) (-i,i=1,nphotons) ! seeds
-     write(14) (nu_cell(i),i=1,nphotons)
+     write(14) (v_em(:,i),i=1,nphotons)
      close(14)
      ! --------------------------------------------------------------------------------------
      if (verbose) then 
@@ -316,7 +320,7 @@ program LyaPhotonsFromGas
   end if
   ! --------------------------------------------------------------------------------------
   
-  deallocate(nu_em,x_em,k_em,nu_cell)
+  deallocate(nu_em,x_em,k_em,nu_cell,v_em)
   
 contains
 
@@ -494,4 +498,3 @@ contains
 
   
 end program LyaPhotonsFromGas
-
