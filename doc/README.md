@@ -29,7 +29,7 @@ Alternatively, follow the instructions below to set up a RASCAS environment usin
 conda update -n base conda
 ```
 
-2. Download the environment file [rascas-environment.yml](https://git-cral.univ-lyon1.fr/rascas/rascas/-/blob/develop/doc/rascas-environment.yml)
+2. Download the environment file [rascas-environment.yml](https://git-cral.univ-lyon1.fr/rascas/rascas/-/blob/master/doc/rascas-environment.yml)
 
 3. Create the environment from the ``rascas-environment.yml`` file by executing the command below in a terminal.
 ```
@@ -58,26 +58,25 @@ In a terminal, run the following commands.
 ```
 git clone https://git-cral.univ-lyon1.fr/rascas/rascas.git
 cd rascas
-git checkout -b develop--track origin/develop
 ```
 
 ### Simple download
 
 Alternatively, you can obtain a tarball of the code using either `curl` or `wget`
 ```
-curl -O https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/develop/rascas-develop.tar.gz
+curl -O https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/master/rascas-master.tar.gz
 ```
 or
 ```
-wget https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/develop/rascas-develop.tar.gz
+wget https://git-cral.univ-lyon1.fr/rascas/rascas/-/archive/master/rascas-master.tar.gz
 ```
 Then, you can untar and uncompress the file with 
 ```
-tar zxvf rascas-develop.tar.gz
+tar zxvf rascas-master.tar.gz
 ```
 And rename the directory (to be consistent with the git method)
 ```
-mv rascas-develop rascas
+mv rascas-master rascas
 ```
 
 ## Building the code
