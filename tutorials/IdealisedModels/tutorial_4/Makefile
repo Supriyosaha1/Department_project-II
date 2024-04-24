@@ -12,7 +12,7 @@ OPENMP = 1
 # Use of MPI? 1=Yes, 0=No
 MPI=1
 
-RASCASPATH = ../../f90/
+RASCASPATH = ../../../f90/
 
 # MacOSX with strange path to internal libraries
 MACOS11 = 0
