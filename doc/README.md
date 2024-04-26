@@ -96,7 +96,7 @@ make all F90=gfortran MPI=0
 
 To test your installation, you can run the first tutorial notebook
 ```
-cd rascas/tutorials/tutorial_1/
+cd rascas/tutorials/IdealisedModels/tutorial_1/
 make all F90=mpif90
 jupyter-notebook Tutorial-1.ipynb
 ```
