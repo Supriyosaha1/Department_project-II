@@ -140,6 +140,14 @@ contains
     end if
     !--LEEP-- 
 
+#ifdef TRANSP
+    ! interrupt RT (medium is transparent) and tag photon packet as done. 
+    p%status       = 1
+    p%xcurr        = ppos
+    p%time         = time
+    p%tau_abs_curr = tau_abs
+    p%iran         = iran
+#else
     ! propagate photon until escape or death ... 
     photon_propagation : do 
 
@@ -356,6 +364,9 @@ contains
        end do propag_in_cell
 
     end do photon_propagation
+
+#endif
+
     !--PEEL--
     ! finish processing peel buffer before moving to next photon packet. 
     if (peeling_off) then 

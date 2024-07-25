@@ -17,7 +17,7 @@ MACOS11 = 0
 
 #############################################################################
 OPTIONS = -cpp
-OPTIONS += -DDISPLAY_PROGRESS_PERCENT
+OPTIONS += -DDISPLAY_PROGRESS_PERCENT 
 ifeq ($(OPENMP),1)
    OPTIONS += -fopenmp
 endif
@@ -49,6 +49,7 @@ ifeq ($(COMPILER),INTEL)
 endif
 
 FFLAGS += $(OPTIONS)
+FFLAGST = $(FFLAGS) -DTRANSP
 
 ifeq ($(MACOS11),1)
    LDFLAGS += -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/
@@ -73,6 +74,8 @@ OBJSMPI = $(OBJSPHO) module_parallel_mpi.o module_worker.o module_master.o
 %.o:%.f90
 	$(F90) $(FFLAGS) -c $^ -o $@
 
+%.ot:%.f90
+	$(F90) $(FFLAGST) -c $^ -o $@
 #############################################################################
 ifeq ($(MPI),1)
 all: clean GenerateAMRmodel CreateDomDump PhotonsFromStars LyaPhotonsFromGas HaPhotonsFromGas PhotonsFromSourceModel rascas rascas-serial
@@ -104,6 +107,9 @@ rascas-serial: $(OBJSPHO) rascas-serial.o
 rascas: $(OBJSMPI) rascas.o
 	$(F90) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJSMPI) rascas.o
 
+rascas_transp: $(OBJSMPI) module_photon.ot rascas.ot
+	$(F90) $(FFLAGST) $(LDFLAGS) -o $@ $(OBJSMPI) rascas.ot
+
 clean:
-	rm -f *.o *.mod
+	rm -f *.o *.mod *.ot
 #############################################################################
