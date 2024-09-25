@@ -5,7 +5,7 @@
 
 The homepage of the **RASCAS** project is [here](http://rascas.univ-lyon1.fr). 
 
-A quick installation guide is available in the [doc](https://git-cral.univ-lyon1.fr/rascas/rascas/-/tree/master/doc/README.md) directory in this repository. Some examples to start with **RASCAS** are available in the [tutorials](https://git-cral.univ-lyon1.fr/rascas/rascas/-/tree/master/tutorials) directory.
+**Check out the new [documentation page](http://rascas.git-cral-pages.univ-lyon1.fr/rascas)!** 
 
 If you use **RASCAS**, please acknowledge [Michel-Dansac et al. 2020, A&A 635, A154](https://www.aanda.org/articles/aa/abs/2020/03/aa34961-18/aa34961-18.html).
 
