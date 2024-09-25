@@ -64,6 +64,7 @@ templates_path = ['_templates']
 #
 #source_suffix = ['.rst', '.md']
 source_suffix = ['.md']
+#source_suffix = {'.md': 'markdown'}
 
 # The master toctree document.
 master_doc = 'index'
@@ -84,6 +85,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 # The name of the Pygments (syntax highlighting) style to use.
 #pygments_style = None
 
+nb_execution_mode = "off"
 
 # -- Options for HTML output -------------------------------------------------
 
