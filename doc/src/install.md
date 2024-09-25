@@ -1,4 +1,5 @@
-# RASCAS installation
+
+# Installation
 
 Before [downloading](#download-the-rascas-code) and [building](#building-the-code) the RASCAS code, make sure to have installed on your laptop the following apps/softwares. 
 
