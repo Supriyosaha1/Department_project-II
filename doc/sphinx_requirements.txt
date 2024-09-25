@@ -1,0 +1,12 @@
+
+sphinx
+sphinx_design
+myst-nb
+sphinx-book-theme
+sphinx-copybutton
+sphinx-simplepdf
+sphinx-rtd-theme
+
+
+
+
