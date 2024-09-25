@@ -42,3 +42,6 @@ __pycache__/
 *.exe
 *.out
 *.app
+
+# sphinx doc
+_build
