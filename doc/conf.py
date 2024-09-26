@@ -108,12 +108,13 @@ html_theme = 'sphinx_book_theme'
 #html_theme_options = {}
 html_theme_options = {
     "use_repository_button": True,
-    "gitlab_url": "https://git-cral.univ-lyon1.fr/rascas/rascas",
+   # "gitlab_url": "https://git-cral.univ-lyon1.fr/rascas/rascas",
 #    "use_issues_button": True,
 #    "use_edit_page_button": True,
 #    "show_toc_level": 3,
 }
 
+html_logo = "./img/rascas_amr.png"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
