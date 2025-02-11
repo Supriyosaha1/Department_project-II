@@ -10,6 +10,6 @@ n_fluo    = 0
 ! parameters to control RT approximations
 isotropic = F
 recoil    = T
-core_skip = T
+core_skip = F
 xcritmax  = 100.
 lee_correction = F

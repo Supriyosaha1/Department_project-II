@@ -363,7 +363,7 @@ contains
              if (scatterer_list(HI_1216_index)%core_skip) then
                 delta_nu_doppler = sqrt(cell_gas%vth_sq_times_m + cell_gas%vturb**2) / scatterer_list(HI_1216_index)%lambda_cm 
                 a = scatterer_list(HI_1216_index)%A_over_fourpi/delta_nu_doppler
-                xcw = 6.9184721d0 + 81.766279d0 / (log10(a)-14.651253d0)  ! Smith+15, Eq. 21
+                xcw = 6.9184721d0 + 81.766279d0 / (log(a)-14.651253d0)  ! Smith+15, Eq. 21
                 x = (nu_cell - scatterer_list(HI_1216_index)%nu)/delta_nu_doppler
                 if (abs(x) < xcw) then ! apply core-skipping
                    CS_tau_cell = tau_ions(HI_1216_index) * (CS_dist_cm / distance_to_border_cm)
