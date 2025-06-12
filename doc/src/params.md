@@ -1,6 +1,8 @@
 
 # Runtime parameters for rascas
 
+Configuration files are organised in sections that each contains parameters related to a given code module. At runtime, codes from the RASCAS suite will search for the sections they need in the configuration file and parse parameter names. A unique configuration file can thus be used for several codes, and sections which are not needed will be ignored. Sections do not need to be in any particular order.  
+
 Note on paths: we recommend defining absolute paths in the parameters. 
 
 #### `[RASCAS]`
@@ -36,7 +38,7 @@ The section `[gas_composition]` is used to define the collection of absorbers. I
 
 
 #### `[LyaPhotonsFromGas]`
-The section `[LyaPhotonsFromGas]` is used to configure the generation of Lyman-alpha photon packets from gas emission processes.
+The section `[LyaPhotonsFromGas]` is used to configure the generation of Lyman-alpha photon packets from gas emission processes. It is read by the code `LyaPhotonsFromGas.f90`.
 
 | Parameter | Default Value | Fortran type | Description |
 |:----------|:--------------|:-------------|:------------|
@@ -57,3 +59,88 @@ The section `[LyaPhotonsFromGas]` is used to configure the generation of Lyman-a
 | `doColls` | `F`                | `logical` | Enable processing of collisional photons |
 | `tcool_resolution` | `5.0`                 | `real` | Temperature resolution factor for cooling calculations |
 | `verbose` | `T` | `logical`                 | Set verbosity to True or False |
+
+
+#### `[HaPhotonsFromGas]`
+The section `[HaPhotonsFromGas]` is used to define runtime parameters related to the generation of H-alpha photons from gas emission processes. It is read by the code `HaPhotonsFromGas.f90`. 
+
+| Parameter                 | Default Value         | Fortran type    | Description |
+|:--------------------------|:----------------------|:----------------|:------------|
+| `outputfileRec`           | `HaPhotIC.rec`        | `character`     | Path to file to which recombination photons will be written |
+| `outputfileCol`           | `HaPhotIC.col`        | `character`     | Path to file to which collisional photons will be written |
+| `repository`              | `./`                  | `character`     | RAMSES run directory (where all `output_xxxxx` folders are) |
+| `snapnum`                 | `1`                   | `integer`       | RAMSES snapshot number to use |
+| `emission_dom_type`       | `sphere`              | `character`     | Type of the emission domain (e.g. cube, sphere, shell, slab)|
+| `emission_dom_pos`        | `(0.5, 0.5, 0.5)`     | `real`          | Center position of the emission domain [code units] |
+| `emission_dom_rsp`        | `0.3`                 | `real`          | Radius of the spherical emission domain [code units] |
+| `emission_dom_size`       | `0.3`                 | `real`          | Size of the cubic emission domain [code units] |
+| `emission_dom_rin`        | `0.0`                 | `real`          | Inner radius of a shell emission domain [code units] |
+| `emission_dom_rout`       | `0.3`                 | `real`          | Outer radius of a shell emission domain [code units] |
+| `emission_dom_thickness`  | `0.1`                 | `real`          | Thickness of a slab emission domain [code units] |
+| `nphotons`                | `10000`               | `integer`       | Number of photon packets to generate |
+| `ranseed`                 | `-100`                | `integer`       | Random number generator seed for photon sampling |
+| `doRecombs`               | `.false.`             | `logical`       | Enable sampling of emission from recombinations |
+| `doColls`                 | `.false.`             | `logical`       | Enable sampling of emission from collisional excitations |
+| `tcool_resolution`        | `0.0`                 | `real`          | Cells with `dt * tcool_resolution > tcool` are excluded from collisional emission |
+| `verbose`                 | `.true.`              | `logical`       | Set verbosity flag |
+
+
+
+#### `[IdealisedModel]`
+The section `[IdealisedModel]` contains parameters that define the idealized models. This section is read by `module_idealised_model.f90`.
+
+| Parameter                      | Default Value | Fortran type  | Description |
+|:-------------------------------|:--------------|:--------------|:------------|
+| `ColumnDensity_cgs`            | `1d15`        | `real`       | Column density from the center to the edge of the sphere [cm^-2] |
+| `idealised_model_box_size_cm`  | `1d24`        | `real`       | Physical size of the simulation box [cm] |
+| `Radius_boxUnits`              | `0.48`        | `real`       | Radius of the sphere in box-size units |
+| `Temperature`                  | `1d4`         | `real`       | Gas temperature [K] |
+| `TurbulentVelocity_kms`        | `10.0`        | `real`       | Turbulent velocity dispersion [km/s] |
+
+
+#### `[master]`
+The section `[master]` is used to define global runtime parameters and checkpoint/restart options.
+
+| Parameter         | Default Value          | Fortran type      | Description |
+|:------------------|:-----------------------|:------------------|:------------|
+| `verbose`         | `.false.`              | `logical`         | Set verbosity flag |
+| `restart`         | `.false.`              | `logical`         | If True, resume run from backup file specified by `PhotonBakFile` |
+| `PhotonBakFile`   | `backup_photons.dat`   | `character`       | Path to the photon backup file |
+| `dt_backup`       | `7200.`                | `real`            | Time interval between backups [seconds] |
+
+
+#### `[mock]`
+The section `[mock]` is used to define parameters for the generation of mock observations.
+
+| Parameter             | Default Value | Fortran type      | Description |
+|:----------------------|:--------------|:------------------|:------------|
+| `nDirections`         | `0`           | `integer`         | Number of viewing directions for mock observations |
+| `mock_parameter_file` | —            | `character`   | Path to the mock parameter configuration file |
+| `mock_outputfilename` | —            | `character`   | Prefix for output mock files (including absolute path); suffixes `.flux`, `.image`, `.spectrum`, or `.cube` will be added automatically |
+
+The mock parameter configuration file is a text file that contains one block per direction (or *pointing*). Each block must contain one line per entry as detailed in the table below. Each block of this file is read by the routine `read_a_mock_param_set` from `module_mock.f90`. 
+
+| Line number | description | units | example | comment |
+|:------------|:------------|:------|:--------|:--------|
+|1 | a normalised vector giving the direction of observation | none |  `0., 0., 1.` | |
+|2 | the coordinates of the target | code units |  `0.5, 0.243, 0.12`| | 
+|3 | the radius of the circular aperture within which we collect flux | code units | `0.01` | If the value is 0, no flux is computed. A non-zero value will generate a `.flux` output. | 
+|4 | number of pixels, aperture radius, min and max wavelengths | no units, code units, Angstrom, Angstrom | `200, 0.01, 1300., 1600.` | If the number of pixels is set to zero, no spectrum is computed. Otherwise, a spectrum is computed and written in the `.spectrum` file.|   
+|5 | number of pixels on each side of the image, size of the image   | no units, code units | `200, 0.01`| If the number of pixels is zero, no image is computed. Otherwise, an image is computed and written to the `.image` file. | 
+|6 | number of pixels in the spectral dimension, number of pixels in the spatial dimensions, min and max wavelengths, side | none, none, Angstrom, Angstrom, code units | `50, 100, 1200, 1230, 0.01`| If any number of pixels is zero, no cube is computed. Otherwise, a cube is computed and written to the `.cube` file. |  
+
+#### `[RASCAS-serial]`
+The section `[RASCAS-serial]` is used to define input/output files and general settings for a serial RASCAS run.
+
+| Parameter        | Default Value           | Fortran type      | Description |
+|:------------------|:------------------------|:-----------------|:------------|
+| `DomDumpDir`      | `test/`                 | `character`      | Directory where the outputs of `CreateDomDump` are located |
+| `PhotonICFile`    | `Photon_IC_file.dat`    | `character`      | Path to the file containing the initial photon packets |
+| `fileout`         | `photons_done.dat`      | `character`      | Path to the output file containing processed photons |
+| `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
+
+
+
+
+
+
