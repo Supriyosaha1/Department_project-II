@@ -34,3 +34,26 @@ The section `[gas_composition]` is used to define the collection of absorbers. I
 
 
 
+
+#### `[LyaPhotonsFromGas]`
+The section `[LyaPhotonsFromGas]` is used to configure the generation of Lyman-alpha photon packets from gas emission processes.
+
+| Parameter | Default Value | Fortran type | Description |
+|:----------|:--------------|:-------------|:------------|
+| `outputfileRec` | `OutputPath/IC_recomb.dat`                 | `character` | Path to the output file for recombination photon packets |
+| `outputfileCol` | `OutputPath/IC_coll.dat`                 | `character` | Path to the output file for collisional photon packets |
+| `repository` |`simulation_path/`                 | `character` | Path to the base repository directory containing simulation data |
+| `snapnum` | `099`                 | `integer` | Snapshot number to process from the simulation |
+| `emission_dom_type` |`cube`                 | `character` | Type of emission domain geometry (e.g., cube, sphere) |
+| `emission_dom_pos` |`1e-01 1e-01 1e-01`                 | `real(3)` | Position coordinates (x, y, z) of the emission domain center |
+| `emission_dom_rsp` |`5e-03`                 | `real` | Spherical domain radius parameter |
+| `emission_dom_rin` |`2e-03`                 | `real` | Inner radius for shell-type emission domains |
+| `emission_dom_rout` |`4e-03`                 | `real` | Outer radius for shell-type emission domains |
+| `emission_dom_size` |`1e-02`                 | `real` | Size parameter of the emission domain |
+| `emission_dom_thickness` |`1e-02`                 | `real` | Thickness parameter for shell-type emission domains |
+| `nPhotonPackets` | `1000000`                 | `integer` | Total number of photon packets to generate |
+| `ranseed` |`-100`                 | `integer` | Random seed for photon packet generation |
+| `doRecombs` | `T`                 | `logical` | Enable processing of recombination photons |
+| `doColls` | `F`                | `logical` | Enable processing of collisional photons |
+| `tcool_resolution` | `5.0`                 | `real` | Temperature resolution factor for cooling calculations |
+| `verbose` | `T` | `logical`                 | Set verbosity to True or False |
