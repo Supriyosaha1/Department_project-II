@@ -28,6 +28,6 @@ git clone --branch develop https://git-cral.univ-lyon1.fr/rascas/rascas.git
 Go to the **develop** branch from the **master** branch: 
 
 ```
-git checkout -b develop--track origin/develop
+git checkout -b develop --track origin/develop
 ```
 
