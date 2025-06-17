@@ -179,7 +179,33 @@ The section `[RASCAS-serial]` is used to define input/output files and general s
 | `fileout`         | `photons_done.dat`      | `character`      | Path to the output file containing processed photons |
 | `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
 
+#### `[CreateDomDump]`
+The section `[CreateDomDump]` is used to configure the generation of the meshes (or domain dumps) from a simulation output. It is read by the code `CreateDomDump.f90`.
 
+| Parameter        | Default Value           | Fortran type      | Description |
+|:------------------|:------------------------|:-----------------|:------------|
+| `DomDumpDir`         | `test/`                 | `character`      | Directory where the outputs of `CreateDomDump` will be written |
+| `repository`         | `./`                       | `character`      | Ramses run directory (where all output_xxxxx dirs are) |
+| `snapnum`               | `1`                         | `integer`          | Ramses output number to use |
+| `reading_method` | `fullbox`             | `character`      | strategy to read ramses data, could be `fullbox`, `hilbert`, `select\_onthefly`, or `select\_onthefly\_h` |
+| `comput_dom_type`       | `sphere`                   | `character`     | Type of the computational domain (e.g. cube, sphere, shell, slab)|
+| `comput_dom_pos`         | `(0.5, 0.5, 0.5)` | `real`          | Center position of the computational domain [code units] |
+| `comput_dom_rsp`         | `0.3`                         | `real`          | Radius of the spherical computational domain [code units] |
+| `comput_dom_size`       | `0.3`                         | `real`          | Size of the cubic computational domain [code units] |
+| `comput_dom_rin`         | `0.0`                         | `real`          | Inner radius of a shell computational domain [code units] |
+| `comput_dom_rout`       | `0.3`                         | `real`          | Outer radius of a shell computational domain [code units] |
+| `comput_dom_thickness`  | `0.1`                    | `real`          | Thickness of a slab computational domain [code units] |
+| `decomp_dom_type`       | `sphere`              | `character` | Type of the decomposition domain(s) (e.g. cube, sphere, shell, slab). Only works with a number of domains, sharing the same type. |
+| `decomp_dom_ndomain` | `1`                        | `integer`    | Number of domains in the decomposition| 
+| `decomp_dom_xc`           | `0.5`                    | `real`          | x center of domain(s) [code units]. A list of `decomp_dom_ndomain` positions should be provided, e.g. `0.25, 0.5, 0.75`| 
+| `decomp_dom_yc`           | `0.5`                    | `real`          | y center of domain(s) [code units] |
+| `decomp_dom_zc`           | `0.5`                    | `real`          | z center of domain(s) [code units] |
+| `decomp_dom_rsp`         | `0.3`                    | `real`          | Radius of the spherical domain(s) [code units] |
+| `decomp_dom_size`       | `0.3`                    | `real`          | Size of the cubic domain(s) [code units] |
+| `decomp_dom_rin`         | `0.0`                    | `real`          | Inner radius of the shell domain(s) [code units] |
+| `decomp_dom_rout`       | `0.3`                    | `real`          | Outer radius of the shell domain(s) [code units] |
+| `decomp_dom_thickness`  | `0.1`               | `real`          | Thickness of the slab domain(s) [code units] |
+| `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
 
 
 
