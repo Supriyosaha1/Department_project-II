@@ -28,8 +28,8 @@ program HaPhotonsFromGas
   ! user-defined parameters - read from section [HaPhotonsFromGas] of the parameter file
   ! ---------------------------------------------------------------------------
   ! --- input / outputs
-  character(2000)           :: outputfileRec = 'HaPhotIC.recHa' ! file to which recombination photons will be written
-  character(2000)           :: outputfileCol = 'HaPhotIC.colHa' ! file to which collisional photons will be written
+  character(2000)           :: outputfileRec = 'HaPhotIC.rec' ! file to which recombination photons will be written
+  character(2000)           :: outputfileCol = 'HaPhotIC.col' ! file to which collisional photons will be written
   character(2000)           :: repository = './'      ! ramses run directory (where all output_xxxxx dirs are).
   integer(kind=4)           :: snapnum = 1            ! ramses output number to use
   ! --- emission domain  
