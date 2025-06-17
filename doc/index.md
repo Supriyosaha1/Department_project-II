@@ -42,6 +42,15 @@ src/params.md
 ```
 
 ```{toctree}
+:caption: About this documentation
+:maxdepth: 1
+
+src/aboutdoc.md
+
+```
+
+
+```{toctree}
 :caption: Developer Documentation
 :maxdepth: 1
 
