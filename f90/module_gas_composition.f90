@@ -177,7 +177,7 @@ contains
     type(gas),dimension(:),allocatable,intent(out)   :: g
     real(kind=8),intent(in),dimension(nleaf,3)       :: x_leaf
     integer(kind=4),intent(in),dimension(nleaf)      :: leaf_level ! not useful anymore (was useful for MC sampling of cell properties), kept in for now...
-    integer(kind=4)                                  :: ileaf
+    integer(kind=4)                                  :: ileaf, i
     real(kind=8)                                     :: T
     real(kind=8),dimension(3)                        :: xtmp
     
@@ -185,10 +185,10 @@ contains
     allocate(g(nleaf))
 
     ! Allocate the density variable
-    ! works only for one ion/element
-    if(element_number /= 1)then
+    ! works only for one ion/element or none
+    if(element_number > 1)then
        print*,'element_number =',element_number
-       print*,'idealised model works only for one element/ion, check the config file...'
+       print*,'idealised model works for at most one element/ion, check the config file...'
        stop
     endif
     do ileaf=1,nleaf
@@ -202,7 +202,9 @@ contains
        ! get gas velocity
        g(ileaf)%v(:) = idealised_model_get_velocity(xtmp)
        ! get density of scatterer
-       g(ileaf)%number_density(1) = idealised_model_get_scatterer_density(xtmp)
+       do i = 1, element_number
+          g(ileaf)%number_density(i) = idealised_model_get_scatterer_density(xtmp)
+       end do
        ! get temperature
        T = idealised_model_get_temperature(xtmp)
        g(ileaf)%vth_sq_times_m = 2 * kb * T / amu
@@ -235,16 +237,24 @@ contains
 
 
   function gas_get_dopvel(x)
-    ! only for idealised_model with only one element/ion!
+    ! only for idealised_model with only one element/ion at most!
     implicit none
     real(kind=8),dimension(3),intent(in) :: x
     real(kind=8)                         :: T,vth_sq_times_m,vturb
-    real(kind=8)                         ::gas_get_dopvel
+    real(kind=8)                         :: gas_get_dopvel
+
+    if (element_number > 1) then
+       write(6,*) " ERROR: function module_gas_composition:gas_get_dopvel called with element_number > 1."
+       stop
+    end if
     T = idealised_model_get_temperature(x)
     vth_sq_times_m = 2 * kb * T / amu
     vturb = idealised_model_get_turbulent_velocity(x)
-    gas_get_dopvel = sqrt(vth_sq_times_m/scatterer_list(1)%m_ion + vturb*vturb)
+    gas_get_dopvel  = vturb*vturb 
+    if (element_number == 1) gas_get_dopvel = gas_get_dopvel + vth_sq_times_m/scatterer_list(1)%m_ion
+    gas_get_dopvel = sqrt(gas_get_dopvel)
     return
+    
   end function gas_get_dopvel
   
   

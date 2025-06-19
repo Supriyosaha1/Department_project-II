@@ -67,10 +67,10 @@ program GenerateAMRmodel
   if (verbose) call print_GenerateAMRmodel_params
   ! ------------------------------------------------------------
 
-  ! idealised model works only for one ion/element
-  if(element_number /= 1)then
+  ! idealised model do not work with multiple ions/elements
+  if(element_number > 1)then
      print*,'element_number =',element_number
-     print*,'idealised model works only for one element/ion, check the config file...'
+     print*,'idealised model works for at most one element/ion, check the config file...'
      stop
   endif
 
