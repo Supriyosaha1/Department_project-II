@@ -1320,13 +1320,15 @@ module module_mesh
       integer(kind=4)                      :: ic,jc,kc,ifirst,jfirst,kfirst,itest,jtest,ktest,i,j,k,ltest
       real(kind=8)                         :: floor_d,floor_v
       real(kind=8)                         :: dx,rhomin,rhomax,vmin,vmax,dopvel_min
-      
+      real(kind=8)                         :: rhod, rhod2, rhodmax, rhodmin, delta_dd      
+
       floor_d = 1.d-30
       floor_v = 1.d-30
       
       ! call im_get_props(x,rho,vel)
       vel(:) = idealised_model_get_velocity(x)
       rho    = idealised_model_get_scatterer_density(x)
+      rhod   = idealised_model_get_dust_density(x)
       
       vnorm=sqrt(vel(1)**2+vel(2)**2+vel(3)**2)
       ! JB- refine on momentum to avoid refining in voids (where the v-field is defined but the density is zero).
@@ -1339,6 +1341,9 @@ module module_mesh
       end if
       rhomin = rho
       rhomax = rho
+      rhodmin = rhod
+      rhodmax = rhod
+      
       ! get doppler velocity dopvel = sqrt(vth^2 + vturb^2)
       !call im_get_vth(vth) ! i put this here but if vth was a function of position it should be somewhere below... 
       dopvel = gas_get_dopvel(x)
@@ -1374,15 +1379,22 @@ module module_mesh
                   xx(3)=(ktest-0.5)*dx
                   !call im_get_props(xx,rho2,vel2)
                   vel2(:) = idealised_model_get_velocity(xx)
-                  rho2 = idealised_model_get_scatterer_density(xx)
+                  rho2    = idealised_model_get_scatterer_density(xx)
+                  rhod2   = idealised_model_get_dust_density(xx)
                   ! recompute vth local here
                   ! and take the min
                   if (rho2 > rhomax) rhomax = rho2
                   if (rho2 < rhomin) rhomin = rho2
+                  if (rhod2 > rhodmax) rhodmax = rhod2
+                  if (rhod2 < rhodmin) rhodmin = rhod2
                   ! RAMSES formulation
                   if(refine_err_grad_d>=0.) then
+                     ! refine on scatterer density 
                      delta_d = (rhomax-rhomin)/(rhomax+rhomin+floor_d)    !! JB - delta_d -> 1 when rho>>rho2 or rho2>>rho... 
                      refine = refine .or. delta_d>=refine_err_grad_d
+                     ! refine on dust density
+                     delta_dd = (rhodmax-rhodmin)/(rhodmax+rhodmin+floor_d)
+                     refine = refine .or. delta_dd>=refine_err_grad_d
                   endif
                   if( (refine_err_grad_v>=0. .or. refine_dv_over_vth) .and. rho2 > 0.0d0 )then  ! JB: only test if there is gas 
                      vnorm2=sqrt(vel2(1)**2+vel2(2)**2+vel2(3)**2)
