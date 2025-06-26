@@ -1,7 +1,7 @@
 
 # Runtime parameters for rascas
 
-Configuration files are organised in sections that each contains parameters related to a given code module. At runtime, codes from the RASCAS suite will search for the sections they need in the configuration file and parse parameter names. A unique configuration file can thus be used for several codes, and sections which are not needed will be ignored. Sections do not need to be in any particular order.  
+Configuration files are organised in sections that each contains parameters related to a given code module. At runtime, codes from the RASCAS suite will search for the sections they need in the configuration file and parse parameter names. A unique configuration file can thus be used for several codes, and sections which are not needed will be ignored. Sections do not need to be in any particular order. Examples of parameter files can be found in the tests directory. 
 
 Note on paths: we recommend defining absolute paths in the parameters. 
 
@@ -20,12 +20,11 @@ The section `[RASCAS]` is used to define runtime parameters of the rascas code.
 
 
 #### `[gas_composition]`
-The section `[gas_composition]` is used to define the collection of absorbers. It is read in `module_gas_composition.f90`.
-
+The section `[gas_composition]` is used to define the collection of absorbers that will interact with photons. It is read in `module_gas_composition.f90` and uses atomic data from files in the directory `atomic_data_dir` which are described below. 
 
 | Parameter | Default Value | Fortran type | Description     |
 |:-------------------|:----------------------|:------------|:------------------- |
-| `nscatterer`       | `1`                   | `integer`   | Number of scatterers in the run    |
+| `nscatterer`       | `1`                   | `integer`   | Number of scatterers in the run    |
 | `scatterer_names`  | `HI-1216`             | `character` | List of names of scatterers (e.g., lines)    |
 | `atomic_data_dir`  | `../ions_parameters/` | `character` | Directory where the atomic data files are located     |
 | `krome_data_dir`   | `./'`                 | `character` | Directory where Krome metallic ion density files are located    |
@@ -33,6 +32,29 @@ The section `[gas_composition]` is used to define the collection of absorbers. I
 | `Zref`             | `0.005`               | `real`      | Reference metallicity (e.g., ~0.005 for SMC, ~0.01 for LMC)|
 | `vturb_kms`        | `20.0`                | `real`      | Constant turbulent velocity across the simulation, in km/s          |
 | `ignoreDust`       | `.false.`             | `logical`   | If true, dust is ignored during radiative transfer (but still defined)    |
+
+The photons may interact with dust and scatterers. Scatterers are defined by their absorption chanel (e.g. `HI-1216` refers to the absorption of radiation at H Lyman-alpha). Some absorption channels may lead to multiple de-excitation routes (e.g. fluorescent emission from SiII). This is allowed and described in the atomic data files. There are example files in the `ions_parameters` directory shipped with the code. The generic format is as follows: 
+```
+! SiII - 1260.42 line
+m_ion          = 28.085d0.      ! mass in atomic mass unit
+name_ion       = SiII           ! name of the ion (prefix of line name)
+lambda_cm      = 1260.42d-8     ! wavelength in cm
+A              = 2.57d9         ! Einstein coefficient A21
+f              = 1.22d0.        ! Oscillator strength
+n_fluo         = 1              ! number of fluorescent channels (i.e. secondary de-escitation channels)
+lambda_fluo_cm = 1265.02d-8     ! wavelengths of these channels 
+A_fluo         = 4.73d8         ! Einseint coeff of these channels
+```
+
+HI-Lyman-alpha is a specific case which has the extra following parameters: 
+```
+isotropic = F        ! controls whether scattering is isotropic or not. 
+recoil    = T        ! controls whether the recoil effect is included or not
+core_skip = F        ! allows the core-skipping approximation
+xcritmax  = 100      ! parameter to moderate the core-skipping approximation
+lee_correction = F   ! apply the Lee correction. 
+```
+
 
 
 #### `[IdealisedModel]`
@@ -61,14 +83,14 @@ The section `[master]` is used to define global runtime parameters and checkpoin
 
 
 #### `[mesh]`
-The section `[mesh]` is used to define mesh refinement parameters and settings.
+The section `[mesh]` is used to define mesh refinement parameters and settings. The parameters `refine_lmax`, `refine_err_grad_d`, `refine_err_grad_v`, and `refine_dv_over_vth` are only used to generate AMR grids for idealised models (i.e. with `GenerateAMRmodel`). These four parameters are ignored when reading simulation outputs. 
 | Parameter              | Default Value | Fortran type | Description        |
 |:-----------------------|:--------------|:-------------|:-------------------|
 | `verbose`              | `T`           | `logical`    | Set verbosity to True or False for mesh operations |
-| `refine_lmax`          | `8`           | `integer`    | Maximum refinement level for adaptive mesh refinement |
-| `refine_err_grad_d`    | `-1.0d0`      | `real`       | Error threshold for density gradient-based refinement |
-| `refine_err_grad_v`    | `-1.d0`       | `real`       | Error threshold for velocity gradient-based refinement |
-| `refine_dv_over_vth`   | `F`           | `logical`    | Enable/disable velocity difference threshold relative to thermal velocity for refinement |
+| `refine_lmax`          | `8`           | `integer`    | Maximum level of refinement allowed in the mesh.|
+| `refine_err_grad_d`    | `-1.0d0`      | `real`       | Parameter to control the refinement on density gradients. A cell will be refined if $(\rho_{max}-\rho_{min})/(\rho_{max}+\rho_{min}) > $ `refine_err_grad_d`, where $\rho_{max}$ and $\rho_{min}$ are the max and min values of densities found accross the cell. Setting `refine_err_grad_d=0.2` triggers refinement when the density varies by more than 10% accross a cell. If a negative value is passed, this criterion is ignored. |
+| `refine_err_grad_v`    | `-1.d0`       | `real`       | Parameter to control the refinement on velocity gradients. Same as for density above, but now computed on the norm of the velocity field. If a negative value is passed, this criterion is ignored.  |
+| `refine_dv_over_vth`   | `F`           | `logical`    | Parameter to control the refinement on the velocity field. If set to True, a cell is refined when variations of the norm of the velocity accross the cell are larger than the local thermal velocity. |
 
 
 
