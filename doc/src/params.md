@@ -88,7 +88,7 @@ The section `[mesh]` is used to define mesh refinement parameters and settings. 
 |:-----------------------|:--------------|:-------------|:-------------------|
 | `verbose`              | `T`           | `logical`    | Set verbosity to True or False for mesh operations |
 | `refine_lmax`          | `8`           | `integer`    | Maximum level of refinement allowed in the mesh.|
-| `refine_err_grad_d`    | `-1.0d0`      | `real`       | Parameter to control the refinement on density gradients. A cell will be refined if $(\rho_{max}-\rho_{min})/(\rho_{max}+\rho_{min}) > $ `refine_err_grad_d`, where $\rho_{max}$ and $\rho_{min}$ are the max and min values of densities found accross the cell. Setting `refine_err_grad_d=0.2` triggers refinement when the density varies by more than 10% accross a cell. If a negative value is passed, this criterion is ignored. |
+| `refine_err_grad_d`    | `-1.0d0`      | `real`       | Parameter to control the refinement on density gradients. A cell will be refined if {math}`(\rho_{max}-\rho_{min})/(\rho_{max}+\rho_{min}) >`  `refine_err_grad_d`, where {math}`\rho_{max}` and {math}`\rho_{min}` are the max and min values of densities found accross the cell. Setting `refine_err_grad_d=0.2` triggers refinement when the density varies by more than 10% accross a cell. If a negative value is passed, this criterion is ignored. |
 | `refine_err_grad_v`    | `-1.d0`       | `real`       | Parameter to control the refinement on velocity gradients. Same as for density above, but now computed on the norm of the velocity field. If a negative value is passed, this criterion is ignored.  |
 | `refine_dv_over_vth`   | `F`           | `logical`    | Parameter to control the refinement on the velocity field. If set to True, a cell is refined when variations of the norm of the velocity accross the cell are larger than the local thermal velocity. |
 
@@ -265,4 +265,36 @@ The section `[GenerateAMRmodel]` is used to configure the generation of the mesh
 | `decomp_dom_rout`       | `0.3`                    | `real`          | Outer radius of the shell domain(s) [code units] |
 | `decomp_dom_thickness`  | `0.1`               | `real`          | Thickness of the slab domain(s) [code units] |
 | `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
+
+
+#### `[PhotonsFromStars]`
+The section `[PhotonsFromStars]` is used to configure the generation of continuum photon packets from the stellar populations. It is read by the code `PhotonsFormStars.f90`.
+
+| Parameter    | Default Value | Fortran type | Description |
+|:----------|:--------------|:-------------|:------------|
+| `outputfile`                     | `PhotICs.dat`             | `character` | Path to the output file for the photon packets |
+| `repository`                     |`./`                                | `character` | Path to the base repository directory containing simulation data |
+| `snapnum`                           | `1`                                 | `integer`     | Snapshot number to process from the simulation |
+| `star_dom_type`               |`cube`                            | `character` | Geometry of the domain containing the emitting stars. Could be cube, sphere, shell, or slab |
+| `star_dom_pos`                 |`5e-01 5e-01 5e-01`  | `real(3)`     | Position coordinates (x, y, z) of the domain center |
+| `star_dom_rsp`                 |`0.3`                              | `real`           | Spherical domain radius parameter |
+| `star_dom_rin`                 |`0.`                                | `real`           | Inner radius for shell-type emission domains |
+| `star_dom_rout`               |`0.3`                              | `real`           | Outer radius for shell-type emission domains |
+| `star_dom_size`               |`0.3`                              | `real`           | Size parameter of the emission domain |
+| `star_dom_thickness`     |`0.1`                              | `real`           | Thickness parameter for shell-type emission domains |
+| `spec_type`                       |`Mono`                            | `character` | Spectral shape of the emitting stars. Could be Mono, Gauss, PowLaw, or Table | 
+| `spec_SSPdir`                   |`../libs/SSPlibs/`    | `character` | The SSP lib directory |
+| `spec_mono_lambda0`       |`1216.`                          | `real`           | Monochromatic emission wavelength [A] |
+| `spec_gauss_lambda0`     |`1216.`                          | `real`           | Central wavelength [A] of the Gaussian distribution | 
+| `spec_gauss_sigma_kms` |`10.0`                            | `real`           | Line width in velocity [km/s] of the Gaussian distribution | 
+| `spec_table_lmin_Ang`   |`1120.`                          | `real`           | min wavelength [A] for the sampling of the tabulated spectrum |
+| `spec_table_lmax_Ang`   |`1320.`                          | `real`           | max wavelength [A] for the sampling of the tabulated spectrum | 
+| `spec_powlaw_lmin_Ang`                               | `1120.`                          | `real`           | min wavelength [A] for the sampling of a power-law continuum |
+| `spec_powlaw_lmax_Ang`                               | `1320.`                          | `real`           | max wavelength [A] for the sampling of a power-law continuum | 
+| `spec_powlaw_Fitlmin_Ang`                         | `1100.`                          | `real`           | min wavelength [A] for the fit  |
+| `spec_powlaw_Fitlmax_Ang`                         | `1400.`                          | `real`           | max wavelength [A] for the fit | 
+| `spec_powlaw _AbsorptionLineClipping` | `.true.`                        | `logical`     | remove absorption lines from fit |
+| `nPhotonPackets`             | `1000000`          | `integer`       | Total number of photon packets to generate |
+| `ranseed`                           |`-100`                 | `integer`       | Random seed for photon packet generation |
+| `verbose`                           | `.true.`            | `logical`       | Set verbosity to True or False |
 
