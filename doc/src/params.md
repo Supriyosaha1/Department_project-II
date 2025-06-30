@@ -70,6 +70,17 @@ The section `[IdealisedModel]` contains parameters that define the idealized mod
 
 
 
+#### `[dust]`
+The section `[dust]` contains parameters that define the dust modelling. This section is read by `module_dust_model.f90`.
+
+| Parameter             | Default Value | Fortran type   | Description |
+|:--------------|:-----------|:------------|:------------|
+| `albedo`            | `0.32`          | `real`           | dust albedo, the value is dust and wavelength dependant. Default 0.32 for Lya, from Li & Draine 2001 | 
+| `g_dust`            | `0.73`          | `real`           | g parameter of the Henyey-Greenstein phase function for dust scattering. Default 0.73 from Li & Draine 2001 |
+| `dust_model`    | `SMC`            | `character` | Dust extinction law. Could be SMC or LMC |
+
+
+
 #### `[master]`
 The section `[master]` is used to define global runtime parameters and checkpoint/restart options.
 
