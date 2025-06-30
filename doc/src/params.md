@@ -309,3 +309,27 @@ The section `[PhotonsFromStars]` is used to configure the generation of continuu
 | `ranseed`                           |`-100`                 | `integer`       | Random seed for photon packet generation |
 | `verbose`                           | `.true.`            | `logical`       | Set verbosity to True or False |
 
+
+
+#### `[ExtractSubvol]`
+The code `ExtractSubvol.f90` is a post-processing tool for RAMSES simulations. It is inherited from the code `CreateDomDump.f90`. The basic idea is to extract from a RAMSES snapshot a subvolume of the simulation using the domain strategy of RASCAS. This cutout is then easy to manipulate with Python. It also uses the rebuilding of the oct-tree structure for the selected cells, allowing the use of neighbors to compute some properties (e.g. velocity dispersion). 
+
+| Parameter        | Default Value           | Fortran type      | Description |
+|:------------------|:------------------------|:-----------------|:------------|
+| `DomDumpDir`         | `test/`                 | `character`      | Directory where the outputs of `CreateDomDump` will be written |
+| `repository`         | `./`                       | `character`      | Ramses run directory (where all output_xxxxx dirs are) |
+| `snapnum`               | `1`                         | `integer`          | Ramses output number to use |
+| `reading_method` | `fullbox`             | `character`      | strategy to read ramses data, could be `fullbox`, `hilbert`, `select_onthefly`, or `select_onthefly_h` |
+| `decomp_dom_type`       | `sphere`              | `character` | Type of the decomposition domain (e.g. cube, sphere, shell, slab). |
+| `decomp_dom_xc`           | `0.5`                    | `real`          | x center of domain [code units] |
+| `decomp_dom_yc`           | `0.5`                    | `real`          | y center of domain [code units] |
+| `decomp_dom_zc`           | `0.5`                    | `real`          | z center of domain [code units] |
+| `decomp_dom_rsp`         | `0.5`                    | `real`          | Radius of the spherical domain [code units] |
+| `decomp_dom_size`       | `0.3`                    | `real`          | Size of the cubic domain [code units] |
+| `decomp_dom_rin`         | `0.0`                    | `real`          | Inner radius of the shell domain [code units] |
+| `decomp_dom_rout`       | `0.3`                    | `real`          | Outer radius of the shell domain [code units] |
+| `decomp_dom_thickness`  | `0.1`               | `real`          | Thickness of the slab domain [code units] |
+| `verbose`         | `.false.`                | `logical`        | Set verbosity flag |
+| `add_stars`     | `.false.`                | `logical`        | If true add the stellar particles contained in the domain to the cutout. |
+| `add_dm`           | `.false.`                | `logical`        | Same for DM particles. Not implemented yet. |
+
