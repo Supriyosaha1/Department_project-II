@@ -25,7 +25,7 @@ The section `[gas_composition]` is used to define the collection of absorbers. I
 
 | Parameter | Default Value | Fortran type | Description     |
 |:-------------------|:----------------------|:------------|:------------------- |
-| `nscatterer`       | `1`                   | `integer`   | Number of scatterers in the run    |
+| `nscatterer`       | `1`                   | `integer`   | Number of scatterers in the run    |
 | `scatterer_names`  | `HI-1216`             | `character` | List of names of scatterers (e.g., lines)    |
 | `atomic_data_dir`  | `../ions_parameters/` | `character` | Directory where the atomic data files are located     |
 | `krome_data_dir`   | `./'`                 | `character` | Directory where Krome metallic ion density files are located    |
@@ -179,8 +179,52 @@ The section `[RASCAS-serial]` is used to define input/output files and general s
 | `fileout`         | `photons_done.dat`      | `character`      | Path to the output file containing processed photons |
 | `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
 
+#### `[Voigt]`
+The section `[Voigt]` is used to define the numerical approximation to the Voigt function, used at each interaction.
+
+| Parameter        | Default Value           | Fortran type      | Description |
+|:------------------|:------------------------|:-----------------|:------------|
+| `approximation`      | `COLT`                 | `character`      | could be 'COLT', 'Tasitsiomi' or 'Humlicek_w4' |
+
+#### `[Worker]`
+The section `[Worker]` is used to assign the computational domain and list of photons for each worker ? 
+
+| Parameter        | Default Value           | Fortran type      | Description |
+|:------------------|:------------------------|:-----------------|:------------|
+|`verbose`         | `.true.`                | `logical`        | Set verbosity flag |
+
+#### `[PhotonsFromSourceModel]`
+The section `[PhotonsFromSourceModel]` is used to define the numerical approximation to the Voigt function, used at each interaction.
+
+| Parameter        | Default Value           | Fortran type      | Description |
+|:------------------|:------------------------|:-----------------|:------------|
+| `outputfile`      | `path_to_output_file`                 | `character`      | define the path to the output file |
+| `source_type`   | `pointlike`                 | `character`      | could be 'pointlike' or ?  |
+| `source_pos`    | `0.5 0.5 0.5`              | `real`               | coordinates of the source, in box units  |
+| `source_vel`     | `0.0`                          | `real`               | velocity of the source, in km/s ? in which direction ?   |
+| `spec_type`       | `Mono`                      | `character`      | could be 'Mono' or 'Gauss' or 'Table'  |
 
 
 
+# computational domain parameters
+  source_type = pointlike
+  source_pos  = 0.5 0.5 0.5
+  source_vel  = 0. 0. 0.
 
+  spec_type = Mono
+  spec_mono_l0_Ang = 1215.67
+#  spec_type = Gauss
+#  spec_gauss_l0_Ang = 1215.67
+#  spec_gauss_sigma_kms = 10.0
+#  spec_type=Table
+#  spec_SSPdir = '../libs/SSPlibs/' ! the SSP lib directory
+#  spec_table_lmin_Ang = 1120.      ! min wavelength to sample
+#  spec_table_lmax_Ang = 1320.      ! max ...
+#  spec_table_age   = 10.0          ! age of the stellar population to use [Myr]
+#  spec_table_met   = 0.02          ! metallicity of the stellar population to use
+#  spec_table_mass  = 1.e6          ! mass of the source [Msun]
 
+# miscelaneous parameters
+  nPhotonPackets  = 1000000
+  ranseed         = -100
+  verbose         = T
