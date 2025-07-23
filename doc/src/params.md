@@ -187,14 +187,14 @@ The section `[Voigt]` is used to define the numerical approximation to the Voigt
 | `approximation`      | `COLT`                 | `character`      | could be 'COLT', 'Tasitsiomi' or 'Humlicek_w4' |
 
 #### `[Worker]`
-The section `[Worker]` is used to assign the computational domain and list of photons for each worker ? 
+The section `[Worker]` assigns the computational domain and list of photons for each worker ? 
 
 | Parameter        | Default Value           | Fortran type      | Description |
 |:------------------|:------------------------|:-----------------|:------------|
 |`verbose`         | `.true.`                | `logical`        | Set verbosity flag |
 
 #### `[PhotonsFromSourceModel]`
-The section `[PhotonsFromSourceModel]` is used to define the numerical approximation to the Voigt function, used at each interaction.
+The section `[PhotonsFromSourceModel]` is used to configure the generation of photon packets from idealised source models. It is read by the code `PhotonsFromSourceModel.f90`.
 
 | Parameter        | Default Value           | Fortran type      | Description |
 |:------------------|:------------------------|:-----------------|:------------|
@@ -203,28 +203,15 @@ The section `[PhotonsFromSourceModel]` is used to define the numerical approxima
 | `source_pos`    | `0.5 0.5 0.5`              | `real`               | coordinates of the source, in box units  |
 | `source_vel`     | `0.0`                          | `real`               | velocity of the source, in km/s ? in which direction ?   |
 | `spec_type`       | `Mono`                      | `character`      | could be 'Mono' or 'Gauss' or 'Table'  |
-
-
-
-# computational domain parameters
-  source_type = pointlike
-  source_pos  = 0.5 0.5 0.5
-  source_vel  = 0. 0. 0.
-
-  spec_type = Mono
-  spec_mono_l0_Ang = 1215.67
-#  spec_type = Gauss
-#  spec_gauss_l0_Ang = 1215.67
-#  spec_gauss_sigma_kms = 10.0
-#  spec_type=Table
-#  spec_SSPdir = '../libs/SSPlibs/' ! the SSP lib directory
-#  spec_table_lmin_Ang = 1120.      ! min wavelength to sample
-#  spec_table_lmax_Ang = 1320.      ! max ...
-#  spec_table_age   = 10.0          ! age of the stellar population to use [Myr]
-#  spec_table_met   = 0.02          ! metallicity of the stellar population to use
-#  spec_table_mass  = 1.e6          ! mass of the source [Msun]
-
-# miscelaneous parameters
-  nPhotonPackets  = 1000000
-  ranseed         = -100
-  verbose         = T
+| `spec_mono_l0_Ang`     | `1215.67`     | `real`               | wavelength of the source in Angstrom, only used if spec_type=Mono   |
+| `spec_gauss_l0_Ang`     | `1215.67`     | `real`               | central wavelength of the gaussian in Angstrom, only used if spec_type=Gauss   |
+| `spec_gauss_sigma_kms`     | `10.0`     | `real`              | width of the gaussian in km/s, only used if spec_type=Gauss   |
+| `spec_SSPdir`       | `path_to_SSPlibs`     | `character`     | path to the SSP lib directory, only used if spec_type=Table   |
+| `spec_table_lmin_Ang`     | `10.0`          | `real`              |min wavelength to sample in Angstrom, only used if spec_type=Table   |
+| `spec_table_lmax_Ang`     | `10.0`        | `real`              | max wavelength to sample in Angstrom, only used if spec_type=Table   |
+| `spec_table_age`     | `10.0`                  | `real`              | age of the stellar population to use in Myr, only used if spec_type=Table   |
+| `spec_table_met`     | `0.02`                  | `real`              | metallicity of the stellar population to use, only used if spec_type=Table   |
+| `spec_table_mass`   | `1.e6`                | `real`              | mass of the source in stellar mass, only used if spec_type=Table   |
+| `nPhotonPackets`     | `1000000`         | `integer`         | Number of photon packets to launch from the source(s ?) |
+| `ranseed`         | `-100`                | `integer`        | seed for the random generator |
+| `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
