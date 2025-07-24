@@ -15,7 +15,7 @@ The section `[RASCAS]` is used to define runtime parameters of the rascas code.
 | `PhotonICfile` | `Photon_IC_file.dat`| `character`  | Path to the photon packet initial conditions file|
 | `fileout`      | `photons_done.dat`  | `character`  | Path to the standard output file|
 | `nbundle`      | `10`                | `integer`    | Number of photon packets sent by the master to each worker at each message (use a large value (e.g. 10,000) when there are few scatterings per photon packet, and a low value (e.g. 10) for Lyman-alpha) | 
-| `verbose`      | `T`                 | `logical`    | set verbosity to True or False |
+| `verbose`      | `.true.`                 | `logical`    | set verbosity to True or False |
 
 
 
@@ -82,7 +82,7 @@ The section `[dust]` contains parameters that define the dust modelling. This se
 
 
 #### `[master]`
-The section `[master]` is used to define global runtime parameters and checkpoint/restart options.
+The section `[master]` is used to define global runtime parameters and checkpoint/restart options. This section is read by `module_master.f90`.
 
 | Parameter         | Default Value          | Fortran type      | Description |
 |:------------------|:-----------------------|:------------------|:------------|
@@ -94,19 +94,19 @@ The section `[master]` is used to define global runtime parameters and checkpoin
 
 
 #### `[mesh]`
-The section `[mesh]` is used to define mesh refinement parameters and settings. The parameters `refine_lmax`, `refine_err_grad_d`, `refine_err_grad_v`, and `refine_dv_over_vth` are only used to generate AMR grids for idealised models (i.e. with `GenerateAMRmodel`). These four parameters are ignored when reading simulation outputs. 
-| Parameter              | Default Value | Fortran type | Description        |
+The section `[mesh]` is used to define mesh refinement parameters and settings.  It is read in `module_mesh.f90`. The parameters `refine_lmax`, `refine_err_grad_d`, `refine_err_grad_v`, and `refine_dv_over_vth` are only used to generate AMR grids for idealised models (i.e. with `GenerateAMRmodel`). These four parameters are ignored when reading simulation outputs. 
+| Parameter                              | Default Value       | Fortran type       | Description        |
 |:-----------------------|:--------------|:-------------|:-------------------|
-| `verbose`              | `T`           | `logical`    | Set verbosity to True or False for mesh operations |
-| `refine_lmax`          | `8`           | `integer`    | Maximum level of refinement allowed in the mesh.|
-| `refine_err_grad_d`    | `-1.0d0`      | `real`       | Parameter to control the refinement on density gradients. A cell will be refined if {math}`(\rho_{max}-\rho_{min})/(\rho_{max}+\rho_{min}) >`  `refine_err_grad_d`, where {math}`\rho_{max}` and {math}`\rho_{min}` are the max and min values of densities found accross the cell. Setting `refine_err_grad_d=0.2` triggers refinement when the density varies by more than 10% accross a cell. If a negative value is passed, this criterion is ignored. |
-| `refine_err_grad_v`    | `-1.d0`       | `real`       | Parameter to control the refinement on velocity gradients. Same as for density above, but now computed on the norm of the velocity field. If a negative value is passed, this criterion is ignored.  |
-| `refine_dv_over_vth`   | `F`           | `logical`    | Parameter to control the refinement on the velocity field. If set to True, a cell is refined when variations of the norm of the velocity accross the cell are larger than the local thermal velocity. |
+| `verbose`                            | `.true.`            | `logical`        | Set verbosity to True or False for mesh operations |
+| `refine_lmax`                    | `8`                      | `integer`        | Maximum level of refinement allowed in the mesh.|
+| `refine_err_grad_d`        | `-1.0d0`            | `real`              | Parameter to control the refinement on density gradients. A cell will be refined if {math}`(\rho_{max}-\rho_{min})/(\rho_{max}+\rho_{min}) >`  `refine_err_grad_d`, where {math}`\rho_{max}` and {math}`\rho_{min}` are the max and min values of densities found accross the cell. Setting `refine_err_grad_d=0.2` triggers refinement when the density varies by more than 10% accross a cell. If a negative value is passed, this criterion is ignored. |
+| `refine_err_grad_v`        | `-1.d0`              | `real`              | Parameter to control the refinement on velocity gradients. Same as for density above, but now computed on the norm of the velocity field. If a negative value is passed, this criterion is ignored.  |
+| `refine_dv_over_vth`      | `.false.`          | `logical`        | Parameter to control the refinement on the velocity field. If set to True, a cell is refined when variations of the norm of the velocity accross the cell are larger than the local thermal velocity. |
 
 
 
 #### `[mock]`
-The section `[mock]` is used to define parameters for the generation of mock observations.
+The section `[mock]` is used to define parameters for the generation of mock observations. This section is read by `module_mock.f90`.
 
 | Parameter             | Default Value | Fortran type      | Description |
 |:----------------------|:--------------|:------------------|:------------|
@@ -128,39 +128,39 @@ The mock parameter configuration file is a text file that contains one block per
 
 
 #### `[ramses]`
-The section `[ramses]` is used to define RAMSES simulation parameters and RT variable settings.
-| Parameter                           | Default Value | Fortran type | Description        |
-|:------------------------------------|:--------------|:-------------|:-------------------|
-| `self_shielding`                    | `T`           | `logical`    | If true, reproduce self-shielding approximation made in RAMSES to compute nHI |
-| `ramses_rt`                         | `F`           | `logical`    | If true, read RAMSES-RT output and compute nHI and T accordingly |
-| `read_rt_variables`                 | `F`           | `logical`    | If true, read RT variables (e.g. to compute heating terms) |
-| `cosmo`                             | `T`           | `logical`    | If false, assume idealised simulation |
-| `use_proper_time`                   | `F`           | `logical`    | If true, use proper time instead of conformal time for cosmo runs |
-| `particle_families`                 | `F`           | `logical`    | If true, all particles have an extra family field, and the header file is different |
-| `verbose`                           | `F`           | `logical`    | Display some run-time info on this module |
+The section `[ramses]` is used to define RAMSES simulation parameters and RT variable settings. This section is read by `module_ramses.f90`.
+| Parameter                           | Default Value      | Fortran type   | Description        |
+|:------------------------------------|:-----------|:-------------|:-------------------|
+| `self_shielding`           | `.true.`           | `logical`    | If true, reproduce self-shielding approximation made in RAMSES to compute nHI |
+| `ramses_rt`                     | `.false.`         | `logical`    | If true, read RAMSES-RT output and compute nHI and T accordingly |
+| `read_rt_variables`     | `.false.`         | `logical`    | If true, read RT variables (e.g. to compute heating terms) |
+| `cosmo`                             | `.true.`           | `logical`    | If false, assume idealised simulation |
+| `use_proper_time`         | `.false.`         | `logical`    | If true, use proper time instead of conformal time for cosmo runs |
+| `particle_families`     | `.false.`         | `logical`    | If true, all particles have an extra family field, and the header file is different |
+| `verbose`                         | `.false.`         | `logical`    | Display some run-time info on this module |
 | `itemp`                             | `5`           | `integer`    | Index of thermal pressure |
-| `imetal`                            | `6`           | `integer`    | Index of metallicity |
-| `ihii`                              | `7`           | `integer`    | Index of HII fraction |
+| `imetal`                           | `6`           | `integer`    | Index of metallicity |
+| `ihii`                               | `7`           | `integer`    | Index of HII fraction |
 | `iheii`                             | `8`           | `integer`    | Index of HeII fraction |
-| `iheiii`                            | `9`           | `integer`    | Index of HeIII fraction |
-| `deut2H_nb_ratio`                   | `3.0d-5`      | `real`       | Ratio between deuterium and hydrogen |
-| `recompute_particle_initial_mass`   | `F`           | `logical`    | If true, recompute particle initial mass |
-| `tdelay_SN`                         | `10.`         | `real`       | Time delay for supernovae in Myr |
-| `recyc_frac`                        | `0.8`         | `real`       | Recycling fraction to correct for mass of stars formed |
+| `iheiii`                           | `9`           | `integer`    | Index of HeIII fraction |
+| `deut2H_nb_ratio`         | `3.0d-5`      | `real`       | Ratio between deuterium and hydrogen |
+| `recompute_particle_initial_mass`   | `.false.` | `logical`    | If true, recompute particle initial mass |
+| `tdelay_SN`                     | `10.`         | `real`       | Time delay for supernovae in Myr |
+| `recyc_frac`                   | `0.8`         | `real`       | Recycling fraction to correct for mass of stars formed |
 
 
 
 #### `[uparallel]`
-The section `[uparallel]` is used to define parameters for parallel velocity computation methods.
-| Parameter      | Default Value | Fortran type | Description        |
-|:---------------|:--------------|:-------------|:-------------------|
-| `method`       | `RASCAS`      | `character`  | Computation method, may be 'Smith', 'Semelin', or 'RASCAS' |
-| `xForGaussian` | `8.0`         | `real`       | Above this value, use a Gaussian to draw u_parallel |
+The section `[uparallel]` is used to define parameters for parallel velocity computation methods. This section is read by `module_uparallel.f90`.
+| Parameter             | Default Value        | Fortran type     | Description        |
+|:---------------|:--------------|:------------|:-------------------|
+| `method`             | `RASCAS`            | `character`  | Computation method, may be 'Smith', 'Semelin', or 'RASCAS' |
+| `xForGaussian` | `8.0`                  | `real`            | Above this value, use a Gaussian to draw u_parallel |
 
 
 
 #### `[voigt]`
-The section `[voigt]` is used to define the numerical approximation to the Voigt function, used at each interaction. 
+The section `[voigt]` is used to define the numerical approximation to the Voigt function, used at each interaction. This section is read by `module_voigt.f90`.
 
 | Parameter        | Default Value           | Fortran type      | Description |
 |:------------------|:------------------------|:-----------------|:------------|
