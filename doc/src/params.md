@@ -159,6 +159,24 @@ The section `[uparallel]` is used to define parameters for parallel velocity com
 
 
 
+#### `[voigt]`
+The section `[voigt]` is used to define the numerical approximation to the Voigt function, used at each interaction. 
+
+| Parameter        | Default Value           | Fortran type      | Description |
+|:------------------|:------------------------|:-----------------|:------------|
+| `approximation`      | `COLT`                 | `character`      | could be 'COLT', 'Tasitsiomi' or 'Humlicek_w4' |
+
+
+
+#### `[worker]`
+The section `[worker]` assigns the computational domain and list of photons for each worker ? 
+
+| Parameter        | Default Value           | Fortran type       | Description |
+|:------------|:----------------|:-------------|:------------|
+|`verbose`       | `.false.`                | `logical`        | Set verbosity flag |
+
+
+
 #### `[RASCAS-serial]`
 The section `[RASCAS-serial]` is used to define input/output files and general settings for a serial RASCAS run.
 
@@ -277,12 +295,7 @@ The section `[GenerateAMRmodel]` is used to configure the generation of the mesh
 | `decomp_dom_thickness`  | `0.1`               | `real`          | Thickness of the slab domain(s) [code units] |
 | `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
 
-#### `[Voigt]`
-The section `[Voigt]` is used to define the numerical approximation to the Voigt function, used at each interaction.
 
-| Parameter        | Default Value           | Fortran type      | Description |
-|:------------------|:------------------------|:-----------------|:------------|
-| `approximation`      | `COLT`                 | `character`      | could be 'COLT', 'Tasitsiomi' or 'Humlicek_w4' |
 
 #### `[PhotonsFromStars]`
 The section `[PhotonsFromStars]` is used to configure the generation of continuum photon packets from the stellar populations. It is read by the code `PhotonsFormStars.f90`.
@@ -315,12 +328,6 @@ The section `[PhotonsFromStars]` is used to configure the generation of continuu
 | `ranseed`                           |`-100`                 | `integer`       | Random seed for photon packet generation |
 | `verbose`                           | `.true.`            | `logical`       | Set verbosity to True or False |
 
-#### `[Worker]`
-The section `[Worker]` assigns the computational domain and list of photons for each worker ? 
-
-| Parameter        | Default Value           | Fortran type      | Description |
-|:------------------|:------------------------|:-----------------|:------------|
-|`verbose`         | `.true.`                | `logical`        | Set verbosity flag |
 
 
 #### `[ExtractSubvol]`
