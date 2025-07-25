@@ -169,7 +169,7 @@ The section `[voigt]` is used to define the numerical approximation to the Voigt
 
 
 #### `[worker]`
-The section `[worker]` assigns the computational domain and list of photons for each worker ? 
+The section `[worker]` is used to define runtime parameters of the workers. This section is read by `module_worker.f90`. 
 
 | Parameter        | Default Value           | Fortran type       | Description |
 |:------------|:----------------|:-------------|:------------|
@@ -180,12 +180,12 @@ The section `[worker]` assigns the computational domain and list of photons for 
 #### `[RASCAS-serial]`
 The section `[RASCAS-serial]` is used to define input/output files and general settings for a serial RASCAS run.
 
-| Parameter        | Default Value           | Fortran type      | Description |
-|:------------------|:------------------------|:-----------------|:------------|
-| `DomDumpDir`      | `test/`                 | `character`      | Directory where the outputs of `CreateDomDump` are located |
-| `PhotonICFile`    | `Photon_IC_file.dat`    | `character`      | Path to the file containing the initial photon packets |
-| `fileout`         | `photons_done.dat`      | `character`      | Path to the output file containing processed photons |
-| `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
+| Parameter              | Default Value                       | Fortran type         | Description |
+|:---------------|:----------------------|:--------------|:------------|
+| `DomDumpDir`      | `test/`                              | `character`      | Directory where the outputs of `CreateDomDump` are located |
+| `PhotonICFile`  | `Photon_IC_file.dat`    | `character`      | Path to the file containing the initial photon packets |
+| `fileout`            | `photons_done.dat`        | `character`      | Path to the output file containing processed photons |
+| `verbose`            | `.true.`                            | `logical`          | Set verbosity flag |
 
 
 
@@ -225,23 +225,23 @@ The section `[LyaPhotonsFromGas]` is used to configure the generation of Lyman-a
 
 | Parameter | Default Value | Fortran type | Description |
 |:----------|:--------------|:-------------|:------------|
-| `outputfileRec` | `OutputPath/IC_recomb.dat`                 | `character` | Path to the output file for recombination photon packets |
-| `outputfileCol` | `OutputPath/IC_coll.dat`                 | `character` | Path to the output file for collisional photon packets |
-| `repository` |`simulation_path/`                 | `character` | Path to the base repository directory containing simulation data |
-| `snapnum` | `099`                 | `integer` | Snapshot number to process from the simulation |
-| `emission_dom_type` |`cube`                 | `character` | Type of emission domain geometry (e.g., cube, sphere) |
+| `outputfileRec` | `LyaPhotIC.recLya`                 | `character` | Path to the output file for recombination photon packets |
+| `outputfileCol` | `LyaPhotIC.colLya`                 | `character` | Path to the output file for collisional photon packets |
+| `repository` |`./`                 | `character` | Path to the base repository directory containing simulation data |
+| `snapnum` | `1`                 | `integer` | Snapshot number to process from the simulation |
+| `emission_dom_type` |`sphere`                 | `character` | Type of emission domain geometry (e.g., cube, sphere) |
 | `emission_dom_pos` |`5e-01 5e-01 5e-01`                 | `real(3)` | Position coordinates (x, y, z) of the emission domain center |
-| `emission_dom_rsp` |`1e-02`                 | `real` | Spherical domain radius parameter |
-| `emission_dom_rin` |`1e-03`                 | `real` | Inner radius for shell-type emission domains |
-| `emission_dom_rout` |`1e-02`                 | `real` | Outer radius for shell-type emission domains |
-| `emission_dom_size` |`1e-02`                 | `real` | Size parameter of the emission domain |
-| `emission_dom_thickness` |`1e-02`                 | `real` | Thickness parameter for shell-type emission domains |
-| `nPhotonPackets` | `1000000`                 | `integer` | Total number of photon packets to generate |
+| `emission_dom_rsp` |`0.3`                 | `real` | Spherical domain radius parameter |
+| `emission_dom_rin` |`0.`                 | `real` | Inner radius for shell-type emission domains |
+| `emission_dom_rout` |`0.3`                 | `real` | Outer radius for shell-type emission domains |
+| `emission_dom_size` |`0.3`                 | `real` | Size parameter of the emission domain |
+| `emission_dom_thickness` |`0.1`                 | `real` | Thickness parameter for shell-type emission domains |
+| `nPhotonPackets` | `10000`                 | `integer` | Total number of photon packets to generate |
 | `ranseed` |`-100`                 | `integer` | Random seed for photon packet generation |
-| `doRecombs` | `T`                 | `logical` | Enable processing of recombination photons |
-| `doColls` | `F`                | `logical` | Enable processing of collisional photons |
-| `tcool_resolution` | `5.0`                 | `real` | Temperature resolution factor for cooling calculations |
-| `verbose` | `T` | `logical`                 | Set verbosity to True or False |
+| `doRecombs` | `.false.`                 | `logical` | Enable processing of recombination photons |
+| `doColls` | `.true.`                | `logical` | Enable processing of collisional photons |
+| `tcool_resolution` | `3.0`                 | `real` | Temperature resolution factor for cooling calculations |
+| `verbose` | `.true.` | `logical`                 | Set verbosity to True or False |
 
 
 
