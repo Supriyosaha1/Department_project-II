@@ -24,8 +24,8 @@ The section `[gas_composition]` is used to define the collection of absorbers th
 
 | Parameter | Default Value | Fortran type | Description     |
 |:-------------------|:----------------------|:------------|:------------------- |
-| `nscatterer`       | `1`                   | `integer`   | Number of scatterers in the run    |
-| `scatterer_names`  | `HI-1216`             | `character` | List of names of scatterers (e.g., lines)    |
+| `nscatterer`       | --                   | `integer`   | Number of scatterers in the run    |
+| `scatterer_names`  | --           | `character` | List of names of scatterers (e.g., lines)    |
 | `atomic_data_dir`  | `../ions_parameters/` | `character` | Directory where the atomic data files are located     |
 | `krome_data_dir`   | `./'`                 | `character` | Directory where Krome metallic ion density files are located    |
 | `f_ion`            | `0.01`                | `real`      | Ionization factor used in dust density computation    |
@@ -356,25 +356,30 @@ The code `ExtractSubvol.f90` is a post-processing tool for RAMSES simulations. I
 #### `[PhotonsFromSourceModel]`
 The section `[PhotonsFromSourceModel]` is used to configure the generation of photon packets from idealised source models. It is read by the code `PhotonsFromSourceModel.f90`.
 
-| Parameter        | Default Value           | Fortran type      | Description |
-|:------------------|:------------------------|:-----------------|:------------|
-| `outputfile`      | `ppic.dat`                   | `character`      | define the path to the output file |
-| `source_type`   | `pointlike`                 | `character`      | can only be point like |
-| `source_pos`    | `0.5 0.5 0.5`              | `real`               | coordinates of the source (x,y,z), in box units  |
-| `source_vel`     | `0.0 0.0 0.0`              | `real`               | velocity of the source (vx,vy,vz), in cm/s    |
-| `nphotons`       | `1000`                       | `integer`         | number of photon to launch from the source |
-| `spec_type`       | `Mono`                      | `character`     | could be 'Mono' or 'Gauss' or 'PowLaw' or 'Table'  |
-| `spec_mono_l0_Ang`     | `1215.67`     | `real`               | wavelength of the source in Angstrom, only used if spec_type=Mono   |
-| `spec_gauss_l0_Ang`     | `1215.67`     | `real`               | central wavelength of the gaussian in Angstrom, only used if spec_type=Gauss   |
-| `spec_gauss_sigma_kms`    | `10.0`     | `real`               | width of the gaussian in km/s, only used if spec_type=Gauss   |
-| `spec_powlaw_lmin_Ang`     | `1120.0` | `real`              |min wavelength to sample in Angstrom, only used if spec_type=PowLaw   |
-| `spec_powlaw_lmax_Ang`    | `1320.0` | `real`              | max wavelength to sample in Angstrom, only used if spec_type=PowLaw   |
-| `spec_powlaw_beta`             | `-2.3`     | `real`              | power law index, only used if spec_type=PowLaw   |
-| `spec_SSPdir`       | `path_to_SSPlibs`     | `character`     | path to the SSP lib directory, only used if spec_type=Table   |
-| `spec_table_lmin_Ang`     | `1120.0`          | `real`              |min wavelength to sample in Angstrom, only used if spec_type=Table   |
-| `spec_table_lmax_Ang`     | `1320.0`        | `real`              | max wavelength to sample in Angstrom, only used if spec_type=Table   |
-| `spec_table_age`     | `10.0`                  | `real`              | age of the stellar population to use in Myr, only used if spec_type=Table   |
-| `spec_table_met`     | `0.02`                  | `real`              | metallicity of the stellar population to use, only used if spec_type=Table   |
-| `spec_table_mass`   | `1.e6`                | `real`              | mass of the source in solar mass, only used if spec_type=Table   |
-| `ranseed`         | `1234`                | `integer`        | seed for the random generator |
+| Parameter                                  | Default Value                | Fortran type      | Description |
+|:-------------------------|:------------------|:-------------|:------------|
+| `outputfile`                          | `ppic.dat`                 | `character`   | define the path to the output file |
+| `source_type`                        | `pointlike`               | `character`   | can only be point like |
+| `source_pos`                          | `0.5 0.5 0.5`           | `real`             | coordinates of the source (x,y,z), in box units  |
+| `source_vel`                          | `0.0 0.0 0.0`           | `real`             | velocity of the source (vx,vy,vz), in cm/s    |
+| `nphotons`                              | `1000`                         | `integer`       | number of photon to launch from the source |
+| `spec_type`                            | `Gauss`                       | `character`   | could be 'Mono' or 'Gauss' or 'PowLaw' or 'Table' or 'TablePowerLaw' |
+| `spec_mono_l0_Ang`              | `1215.67`                   | `real`             | wavelength of the source in Angstrom, only used if spec_type=Mono   |
+| `spec_gauss_l0_Ang`            | `1215.67`                   | `real`             | central wavelength of the gaussian in Angstrom, only used if spec_type=Gauss   |
+| `spec_gauss_sigma_kms`      | `10.0`                         | `real`             | width of the gaussian in km/s, only used if spec_type=Gauss   |
+| `spec_powlaw_lmin_Ang`      | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if spec_type=PowLaw   |
+| `spec_powlaw_lmax_Ang`      | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if spec_type=PowLaw   |
+| `spec_powlaw_beta`              | `-2.3`                         | `real`             | power law index, only used if spec_type=PowLaw   |
+| `spec_SSPdir`                        | `../libs/SSPlibs/` | `character`   | path to the SSP lib directory, only used if spec_type=Table or spec_type=TablePowLaw  |
+| `spec_table_lmin_Ang`        | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if spec_type=Table   |
+| `spec_table_lmax_Ang`        | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if spec_type=Table   |
+| `spec_table_age`                  | `10.0`                         | `real`             | age of the stellar population to use in Myr, only used if spec_type=Table or spec_type=TablePowLaw   |
+| `spec_table_met`                  | `0.02`                         | `real`             | metallicity of the stellar population to use, only used if spec_type=Table  or spec_type=TablePowLaw  |
+| `spec_table_mass`                | `1.e6`                         | `real`             | mass of the source in solar mass, only used if spec_type=Table or spec_type=TablePowLaw   |
+| `spec_tpl_lmin_Ang`            | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if spec_type=TablePowLaw   |
+| `spec_tpl_lmax_Ang`            | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if spec_type=TablePowLaw   |
+| `spec_tpl_Fitlmin_Ang`      | `1100.`                       | `real`             | min wavelength to sample for fit, only used if spec_type=TablePowLaw   |
+| `spec_tpl_Fitlmax_Ang`      | `1500.`                       | `real`             | max wavelength to sample for fit, only used if spec_type=TablePowLaw   |
+| `spec_tpl_AbsorptionLineClipping` | `.true.`    | `logical`       | if true remove absorption lines from fit, only used if spec_type=TablePowLaw |
+| `ranseed`         | `1234`                    | `integer`        | seed for the random generator |
 | `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
