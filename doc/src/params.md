@@ -261,7 +261,7 @@ The section `[HaPhotonsFromGas]` is used to define runtime parameters related to
 | `emission_dom_rin`        | `0.0`                 | `real`          | Inner radius of a shell emission domain [code units] |
 | `emission_dom_rout`       | `0.3`                 | `real`          | Outer radius of a shell emission domain [code units] |
 | `emission_dom_thickness`  | `0.1`                 | `real`          | Thickness of a slab emission domain [code units] |
-| `nphotons`                | `10000`               | `integer`       | Number of photon packets to generate |
+| `nPhotonPackets`                | `10000`               | `integer`       | Number of photon packets to generate |
 | `ranseed`                 | `-100`                | `integer`       | Random number generator seed for photon sampling |
 | `doRecombs`               | `.false.`             | `logical`       | Enable sampling of emission from recombinations |
 | `doColls`                 | `.false.`             | `logical`       | Enable sampling of emission from collisional excitations |
@@ -362,7 +362,7 @@ The section `[PhotonsFromSourceModel]` is used to configure the generation of ph
 | `source_type`                        | `pointlike`               | `character`   | Can only be point like |
 | `source_pos`                          | `0.5 0.5 0.5`           | `real`             | Coordinates of the source (x,y,z), in box units  |
 | `source_vel`                          | `0.0 0.0 0.0`           | `real`             | Velocity of the source (vx,vy,vz), in cm/s    |
-| `nphotons`                              | `1000`                         | `integer`       | Number of photon to launch from the source |
+| `nPhotonPackets`                  | `1000`                         | `integer`       | Number of photon to launch from the source |
 | `spec_type`                            | `Gauss`                       | `character`   | Could be 'Mono' or 'Gauss' or 'PowLaw' or 'Table' or 'TablePowerLaw' |
 | `spec_mono_l0_Ang`              | `1215.67`                   | `real`             | Wavelength of the source in Angstrom, only used if `spec_type = Mono`   |
 | `spec_gauss_l0_Ang`            | `1215.67`                   | `real`             | Central wavelength of the gaussian in Angstrom, only used if `spec_type = Gauss`   |
