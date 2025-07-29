@@ -15,7 +15,7 @@ The section `[RASCAS]` is used to define runtime parameters of the rascas code.
 | `PhotonICfile` | `Photon_IC_file.dat`| `character`  | Path to the photon packet initial conditions file|
 | `fileout`      | `photons_done.dat`  | `character`  | Path to the standard output file|
 | `nbundle`      | `10`                | `integer`    | Number of photon packets sent by the master to each worker at each message (use a large value (e.g. 10,000) when there are few scatterings per photon packet, and a low value (e.g. 10) for Lyman-alpha) | 
-| `verbose`      | `.true.`                 | `logical`    | set verbosity to True or False |
+| `verbose`      | `.true.`                 | `logical`    | Set verbosity to true or false |
 
 
 
@@ -24,7 +24,7 @@ The section `[dust]` contains parameters that define the dust modelling. This se
 
 | Parameter             | Default Value | Fortran type   | Description |
 |:--------------|:-----------|:------------|:------------|
-| `albedo`            | `0.32`          | `real`           | dust albedo, the value is dust and wavelength dependant. Default 0.32 for Lya, from Li & Draine 2001 | 
+| `albedo`            | `0.32`          | `real`           | Dust albedo, the value is dust and wavelength dependant. Default 0.32 for Lya, from Li & Draine 2001 | 
 | `g_dust`            | `0.73`          | `real`           | g parameter of the Henyey-Greenstein phase function for dust scattering. Default 0.73 from Li & Draine 2001 |
 | `dust_model`    | `SMC`            | `character` | Dust extinction law. Could be SMC or LMC |
 
@@ -38,7 +38,7 @@ The section `[gas_composition]` is used to define the collection of absorbers th
 | `nscatterer`       | --                   | `integer`   | Number of scatterers in the run    |
 | `scatterer_names`  | --           | `character` | List of names of scatterers (e.g., lines)    |
 | `atomic_data_dir`  | `../ions_parameters/` | `character` | Directory where the atomic data files are located     |
-| `krome_data_dir`   | `./'`                 | `character` | Directory where Krome metallic ion density files are located    |
+| `krome_data_dir`   | `./'`                 | `character` | Directory where Krome metallic ion density files are located (optional)   |
 | `f_ion`            | `0.01`                | `real`      | Ionization factor used in dust density computation    |
 | `Zref`             | `0.005`               | `real`      | Reference metallicity (e.g., ~0.005 for SMC, ~0.01 for LMC)|
 | `vturb_kms`        | `20.0`                | `real`      | Constant turbulent velocity across the simulation, in km/s          |
@@ -74,7 +74,7 @@ The section `[IdealisedModel]` contains parameters that define the idealized mod
 | Parameter                      | Default Value | Fortran type  | Description |
 |:-------------------------------|:--------------|:--------------|:------------|
 | `ColumnDensity_cgs`            | `1d15`        | `real`       | Column density from the center to the edge of the sphere [cm^-2] |
-| `box_size_cm`  | `1d24`        | `real`       | Physical size of the simulation box [cm] |
+| `boxsize_cm`  | `1d24`        | `real`       | Physical size of the simulation box [cm] |
 | `Radius_boxUnits`              | `0.48`        | `real`       | Radius of the sphere in box-size units |
 | `Temperature`                  | `1d4`         | `real`       | Gas temperature [K] |
 | `TurbulentVelocity_kms`        | `10.0`        | `real`       | Turbulent velocity dispersion [km/s] |
@@ -87,7 +87,7 @@ The section `[master]` is used to define global runtime parameters and checkpoin
 | Parameter         | Default Value          | Fortran type      | Description |
 |:------------------|:-----------------------|:------------------|:------------|
 | `verbose`         | `.false.`              | `logical`         | Set verbosity flag |
-| `restart`         | `.false.`              | `logical`         | If True, resume run from backup file specified by `PhotonBakFile` |
+| `restart`         | `.false.`              | `logical`         | If true, resume run from backup file specified by `PhotonBakFile` |
 | `PhotonBakFile`   | `backup_photons.dat`   | `character`       | Path to the photon backup file |
 | `dt_backup`       | `7200.`                | `real`            | Time interval between backups [seconds] |
 
@@ -97,11 +97,11 @@ The section `[master]` is used to define global runtime parameters and checkpoin
 The section `[mesh]` is used to define mesh refinement parameters and settings.  It is read in `module_mesh.f90`. The parameters `refine_lmax`, `refine_err_grad_d`, `refine_err_grad_v`, and `refine_dv_over_vth` are only used to generate AMR grids for idealised models (i.e. with `GenerateAMRmodel`). These four parameters are ignored when reading simulation outputs. 
 | Parameter                              | Default Value       | Fortran type       | Description        |
 |:-----------------------|:--------------|:-------------|:-------------------|
-| `verbose`                            | `.true.`            | `logical`        | Set verbosity to True or False for mesh operations |
+| `verbose`                            | `.true.`            | `logical`        | Set verbosity to true or false for mesh operations |
 | `refine_lmax`                    | `8`                      | `integer`        | Maximum level of refinement allowed in the mesh.|
 | `refine_err_grad_d`        | `-1.0d0`            | `real`              | Parameter to control the refinement on density gradients. A cell will be refined if {math}`(\rho_{max}-\rho_{min})/(\rho_{max}+\rho_{min}) >`  `refine_err_grad_d`, where {math}`\rho_{max}` and {math}`\rho_{min}` are the max and min values of densities found accross the cell. Setting `refine_err_grad_d=0.2` triggers refinement when the density varies by more than 10% accross a cell. If a negative value is passed, this criterion is ignored. |
 | `refine_err_grad_v`        | `-1.d0`              | `real`              | Parameter to control the refinement on velocity gradients. Same as for density above, but now computed on the norm of the velocity field. If a negative value is passed, this criterion is ignored.  |
-| `refine_dv_over_vth`      | `.false.`          | `logical`        | Parameter to control the refinement on the velocity field. If set to True, a cell is refined when variations of the norm of the velocity accross the cell are larger than the local thermal velocity. |
+| `refine_dv_over_vth`      | `.false.`          | `logical`        | Parameter to control the refinement on the velocity field. If set to true, a cell is refined when variations of the norm of the velocity accross the cell are larger than the local thermal velocity. |
 
 
 
@@ -145,8 +145,8 @@ The section `[ramses]` is used to define RAMSES simulation parameters and RT var
 | `iheiii`                           | `9`           | `integer`    | Index of HeIII fraction |
 | `deut2H_nb_ratio`         | `3.0d-5`      | `real`       | Ratio between deuterium and hydrogen |
 | `recompute_particle_initial_mass`   | `.false.` | `logical`    | If true, recompute particle initial mass |
-| `tdelay_SN`                     | `10.`         | `real`       | Time delay for supernovae in Myr |
-| `recyc_frac`                   | `0.8`         | `real`       | Recycling fraction to correct for mass of stars formed |
+| `tdelay_SN`                     | `10.`         | `real`       | Time delay for supernovae in Myr, only used if `recompute_particle_initial_mass` is true |
+| `recyc_frac`                   | `0.8`         | `real`       | Recycling fraction to correct for mass of stars formed, only used if `recompute_particle_initial_mass` is true |
 
 
 
@@ -164,7 +164,7 @@ The section `[voigt]` is used to define the numerical approximation to the Voigt
 
 | Parameter        | Default Value           | Fortran type      | Description |
 |:------------------|:------------------------|:-----------------|:------------|
-| `approximation`      | `COLT`                 | `character`      | could be 'COLT', 'Tasitsiomi' or 'Humlicek_w4' |
+| `approximation`      | `COLT`                 | `character`      | Could be 'COLT', 'Tasitsiomi' or 'Humlicek_w4' |
 
 
 
@@ -197,7 +197,7 @@ The section `[CreateDomDump]` is used to configure the generation of the meshes 
 | `DomDumpDir`         | `test/`                 | `character`      | Directory where the outputs of `CreateDomDump` will be written |
 | `repository`         | `./`                       | `character`      | Ramses run directory (where all output_xxxxx dirs are) |
 | `snapnum`               | `1`                         | `integer`          | Ramses output number to use |
-| `reading_method` | `fullbox`             | `character`      | strategy to read ramses data, could be `fullbox`, `hilbert`, `select\_onthefly`, or `select\_onthefly\_h` |
+| `reading_method` | `fullbox`             | `character`      | strategy to read ramses data, could be `fullbox`, `hilbert`, `select_onthefly`, or `select_onthefly_h` |
 | `comput_dom_type`       | `sphere`                   | `character`     | Type of the computational domain (e.g. cube, sphere, shell, slab)|
 | `comput_dom_pos`         | `(0.5, 0.5, 0.5)` | `real`          | Center position of the computational domain [code units] |
 | `comput_dom_rsp`         | `0.3`                         | `real`          | Radius of the spherical computational domain [code units] |
@@ -241,7 +241,7 @@ The section `[LyaPhotonsFromGas]` is used to configure the generation of Lyman-a
 | `doRecombs` | `.false.`                 | `logical` | Enable processing of recombination photons |
 | `doColls` | `.true.`                | `logical` | Enable processing of collisional photons |
 | `tcool_resolution` | `3.0`                 | `real` | Temperature resolution factor for cooling calculations |
-| `verbose` | `.true.` | `logical`                 | Set verbosity to True or False |
+| `verbose` | `.true.` | `logical`                 | Set verbosity to true or false |
 
 
 
@@ -323,10 +323,10 @@ The section `[PhotonsFromStars]` is used to configure the generation of continuu
 | `spec_powlaw_lmax_Ang`                               | `1320.`                          | `real`           | max wavelength [A] for the sampling of a power-law continuum | 
 | `spec_powlaw_Fitlmin_Ang`                         | `1100.`                          | `real`           | min wavelength [A] for the fit  |
 | `spec_powlaw_Fitlmax_Ang`                         | `1400.`                          | `real`           | max wavelength [A] for the fit | 
-| `spec_powlaw _AbsorptionLineClipping` | `.true.`                        | `logical`     | remove absorption lines from fit |
+| `spec_powlaw _AbsorptionLineClipping` | `.true.`                        | `logical`     | If true remove absorption lines from fit |
 | `nPhotonPackets`             | `1000000`          | `integer`       | Total number of photon packets to generate |
 | `ranseed`                           |`-100`                 | `integer`       | Random seed for photon packet generation |
-| `verbose`                           | `.true.`            | `logical`       | Set verbosity to True or False |
+| `verbose`                           | `.true.`            | `logical`       | Set verbosity to true or false |
 
 
 
@@ -358,28 +358,28 @@ The section `[PhotonsFromSourceModel]` is used to configure the generation of ph
 
 | Parameter                                  | Default Value                | Fortran type      | Description |
 |:-------------------------|:------------------|:-------------|:------------|
-| `outputfile`                          | `ppic.dat`                 | `character`   | define the path to the output file |
-| `source_type`                        | `pointlike`               | `character`   | can only be point like |
-| `source_pos`                          | `0.5 0.5 0.5`           | `real`             | coordinates of the source (x,y,z), in box units  |
-| `source_vel`                          | `0.0 0.0 0.0`           | `real`             | velocity of the source (vx,vy,vz), in cm/s    |
-| `nphotons`                              | `1000`                         | `integer`       | number of photon to launch from the source |
-| `spec_type`                            | `Gauss`                       | `character`   | could be 'Mono' or 'Gauss' or 'PowLaw' or 'Table' or 'TablePowerLaw' |
-| `spec_mono_l0_Ang`              | `1215.67`                   | `real`             | wavelength of the source in Angstrom, only used if spec_type=Mono   |
-| `spec_gauss_l0_Ang`            | `1215.67`                   | `real`             | central wavelength of the gaussian in Angstrom, only used if spec_type=Gauss   |
-| `spec_gauss_sigma_kms`      | `10.0`                         | `real`             | width of the gaussian in km/s, only used if spec_type=Gauss   |
-| `spec_powlaw_lmin_Ang`      | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if spec_type=PowLaw   |
-| `spec_powlaw_lmax_Ang`      | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if spec_type=PowLaw   |
-| `spec_powlaw_beta`              | `-2.3`                         | `real`             | power law index, only used if spec_type=PowLaw   |
-| `spec_SSPdir`                        | `../libs/SSPlibs/` | `character`   | path to the SSP lib directory, only used if spec_type=Table or spec_type=TablePowLaw  |
-| `spec_table_lmin_Ang`        | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if spec_type=Table   |
-| `spec_table_lmax_Ang`        | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if spec_type=Table   |
-| `spec_table_age`                  | `10.0`                         | `real`             | age of the stellar population to use in Myr, only used if spec_type=Table or spec_type=TablePowLaw   |
-| `spec_table_met`                  | `0.02`                         | `real`             | metallicity of the stellar population to use, only used if spec_type=Table  or spec_type=TablePowLaw  |
-| `spec_table_mass`                | `1.e6`                         | `real`             | mass of the source in solar mass, only used if spec_type=Table or spec_type=TablePowLaw   |
-| `spec_tpl_lmin_Ang`            | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if spec_type=TablePowLaw   |
-| `spec_tpl_lmax_Ang`            | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if spec_type=TablePowLaw   |
-| `spec_tpl_Fitlmin_Ang`      | `1100.`                       | `real`             | min wavelength to sample for fit, only used if spec_type=TablePowLaw   |
-| `spec_tpl_Fitlmax_Ang`      | `1500.`                       | `real`             | max wavelength to sample for fit, only used if spec_type=TablePowLaw   |
-| `spec_tpl_AbsorptionLineClipping` | `.true.`    | `logical`       | if true remove absorption lines from fit, only used if spec_type=TablePowLaw |
-| `ranseed`         | `1234`                    | `integer`        | seed for the random generator |
+| `outputfile`                          | `ppic.dat`                 | `character`   | Define the path to the output file |
+| `source_type`                        | `pointlike`               | `character`   | Can only be point like |
+| `source_pos`                          | `0.5 0.5 0.5`           | `real`             | Coordinates of the source (x,y,z), in box units  |
+| `source_vel`                          | `0.0 0.0 0.0`           | `real`             | Velocity of the source (vx,vy,vz), in cm/s    |
+| `nphotons`                              | `1000`                         | `integer`       | Number of photon to launch from the source |
+| `spec_type`                            | `Gauss`                       | `character`   | Could be 'Mono' or 'Gauss' or 'PowLaw' or 'Table' or 'TablePowerLaw' |
+| `spec_mono_l0_Ang`              | `1215.67`                   | `real`             | Wavelength of the source in Angstrom, only used if `spec_type = Mono`   |
+| `spec_gauss_l0_Ang`            | `1215.67`                   | `real`             | Central wavelength of the gaussian in Angstrom, only used if `spec_type = Gauss`   |
+| `spec_gauss_sigma_kms`      | `10.0`                         | `real`             | Width of the gaussian in km/s, only used if `spec_type = Gauss`   |
+| `spec_powlaw_lmin_Ang`      | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if `spec_type = PowLaw`   |
+| `spec_powlaw_lmax_Ang`      | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if `spec_type = PowLaw`   |
+| `spec_powlaw_beta`              | `-2.3`                         | `real`             | Power law index, only used if `spec_type = PowLaw`   |
+| `spec_SSPdir`                        | `../libs/SSPlibs/` | `character`   | Path to the SSP lib directory, only used if `spec_type = Table` or `spec_type = TablePowLaw`  |
+| `spec_table_lmin_Ang`        | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if `spec_type = Table`   |
+| `spec_table_lmax_Ang`        | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if `spec_type = Table`   |
+| `spec_table_age`                  | `10.0`                         | `real`             | Age of the stellar population to use in Myr, only used if `spec_type = Table` or `spec_type = TablePowLaw`   |
+| `spec_table_met`                  | `0.02`                         | `real`             | Metallicity of the stellar population to use, only used if `spec_type = Table`  or `spec_type = TablePowLaw`  |
+| `spec_table_mass`                | `1.e6`                         | `real`             | Mass of the source in solar mass, only used if `spec_type = Table` or `spec_type = TablePowLaw`   |
+| `spec_tpl_lmin_Ang`            | `1120.0`                     | `real`             | min wavelength to sample in Angstrom, only used if `spec_type = TablePowLaw`   |
+| `spec_tpl_lmax_Ang`            | `1320.0`                     | `real`             | max wavelength to sample in Angstrom, only used if `spec_type = TablePowLaw`   |
+| `spec_tpl_Fitlmin_Ang`      | `1100.`                       | `real`             | min wavelength to sample for fit, only used if `spec_type = TablePowLaw`   |
+| `spec_tpl_Fitlmax_Ang`      | `1500.`                       | `real`             | max wavelength to sample for fit, only used if `spec_type = TablePowLaw`   |
+| `spec_tpl_AbsorptionLineClipping` | `.true.`    | `logical`       | If true remove absorption lines from fit, only used if `spec_type = TablePowLaw` |
+| `ranseed`         | `1234`                    | `integer`        | Seed for the random generator |
 | `verbose`         | `.true.`                | `logical`        | Set verbosity flag |
