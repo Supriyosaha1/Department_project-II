@@ -19,6 +19,17 @@ The section `[RASCAS]` is used to define runtime parameters of the rascas code.
 
 
 
+#### `[dust]`
+The section `[dust]` contains parameters that define the dust modelling. This section is read by `module_dust_model.f90`. 
+
+| Parameter             | Default Value | Fortran type   | Description |
+|:--------------|:-----------|:------------|:------------|
+| `albedo`            | `0.32`          | `real`           | dust albedo, the value is dust and wavelength dependant. Default 0.32 for Lya, from Li & Draine 2001 | 
+| `g_dust`            | `0.73`          | `real`           | g parameter of the Henyey-Greenstein phase function for dust scattering. Default 0.73 from Li & Draine 2001 |
+| `dust_model`    | `SMC`            | `character` | Dust extinction law. Could be SMC or LMC |
+
+
+
 #### `[gas_composition]`
 The section `[gas_composition]` is used to define the collection of absorbers that will interact with photons. It is read in `module_gas_composition.f90` and uses atomic data from files in the directory `atomic_data_dir` which are described below. 
 
@@ -67,17 +78,6 @@ The section `[IdealisedModel]` contains parameters that define the idealized mod
 | `Radius_boxUnits`              | `0.48`        | `real`       | Radius of the sphere in box-size units |
 | `Temperature`                  | `1d4`         | `real`       | Gas temperature [K] |
 | `TurbulentVelocity_kms`        | `10.0`        | `real`       | Turbulent velocity dispersion [km/s] |
-
-
-
-#### `[dust]`
-The section `[dust]` contains parameters that define the dust modelling. This section is read by `module_dust_model.f90`.
-
-| Parameter             | Default Value | Fortran type   | Description |
-|:--------------|:-----------|:------------|:------------|
-| `albedo`            | `0.32`          | `real`           | dust albedo, the value is dust and wavelength dependant. Default 0.32 for Lya, from Li & Draine 2001 | 
-| `g_dust`            | `0.73`          | `real`           | g parameter of the Henyey-Greenstein phase function for dust scattering. Default 0.73 from Li & Draine 2001 |
-| `dust_model`    | `SMC`            | `character` | Dust extinction law. Could be SMC or LMC |
 
 
 
