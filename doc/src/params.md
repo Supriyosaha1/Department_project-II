@@ -74,7 +74,7 @@ The section `[IdealisedModel]` contains parameters that define the idealized mod
 | Parameter                      | Default Value | Fortran type  | Description |
 |:-------------------------------|:--------------|:--------------|:------------|
 | `ColumnDensity_cgs`            | `1d15`        | `real`       | Column density from the center to the edge of the sphere [cm^-2] |
-| `idealised_model_box_size_cm`  | `1d24`        | `real`       | Physical size of the simulation box [cm] |
+| `box_size_cm`  | `1d24`        | `real`       | Physical size of the simulation box [cm] |
 | `Radius_boxUnits`              | `0.48`        | `real`       | Radius of the sphere in box-size units |
 | `Temperature`                  | `1d4`         | `real`       | Gas temperature [K] |
 | `TurbulentVelocity_kms`        | `10.0`        | `real`       | Turbulent velocity dispersion [km/s] |
