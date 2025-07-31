@@ -339,9 +339,9 @@ contains
     end do
     ! stats
     call MPI_RECV(count, 1, MPI_INTEGER, idcpu, DONE_TAG , MPI_COMM_WORLD, status, IERROR)
-    peels_count = peels_count+count
+    peels_count_tot = peels_count_tot + count
     call MPI_RECV(count, 1, MPI_INTEGER, idcpu, DONE_TAG , MPI_COMM_WORLD, status, IERROR)
-    rays_count = rays_count+count
+    rays_count_tot = rays_count_tot + count
     
     return
     

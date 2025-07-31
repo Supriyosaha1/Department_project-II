@@ -46,13 +46,15 @@ module module_mock
   ! for statistics
   integer(kind=4) :: peels_count,rays_count
   integer(kind=4), allocatable, dimension(:) :: detectors_count
-
+  integer(kind=8) :: peels_count_tot, rays_count_tot
+  
   ! global parameter setting peeling-off on or off.
   logical         :: peeling_off
   
   ! public variables
   public :: peeling_off, nDirections, mock
   public :: peels_count,rays_count,detectors_count
+  public :: peels_count_tot, rays_count_tot
 
   ! public functions
   public :: read_mock_params, print_mock_params, dump_mocks
@@ -139,6 +141,8 @@ contains
        peels_count = 0
        rays_count = 0
        detectors_count(:) = 0
+       peels_count_tot = 0
+       rays_count_tot = 0
        close(unit)
     else
        peeling_off = .false. 
