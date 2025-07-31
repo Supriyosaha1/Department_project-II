@@ -9,11 +9,11 @@ module module_idealised_model
   private
 
   ! custom parameters read from configuration file 
-  real(kind=8) :: ColumnDensity_cgs     ! column density from center to edge of sphere [cm^-2]
-  real(kind=8) :: idealised_model_box_size_cm ! size of the box in cm
-  real(kind=8) :: Radius_boxUnits            ! radius of sphere in box-size units
-  real(kind=8) :: Temperature           ! gas temperature [K]
-  real(kind=8) :: TurbulentVelocity_kms ! velocity dispersion (sigma) due to turbulent velocity [km/s]
+  real(kind=8) :: ColumnDensity_cgs = 1d15           ! column density from center to edge of sphere [cm^-2]
+  real(kind=8) :: idealised_model_box_size_cm = 1e24 ! size of the box in cm
+  real(kind=8) :: Radius_boxUnits = 0.48             ! radius of sphere in box-size units
+  real(kind=8) :: Temperature = 1d4                  ! gas temperature [K]
+  real(kind=8) :: TurbulentVelocity_kms = 10.0d0     ! velocity dispersion (sigma) due to turbulent velocity [km/s]
   
   ! useful derived parameters
   real(kind=8) :: Radius_cgs ! Radius of sphere in cm
@@ -162,7 +162,6 @@ contains
        write(unit,'(a,ES13.6)')  '  Radius_boxUnits       = ',Radius_boxUnits
        write(unit,'(a,ES13.6)')  '  Temperature           = ',Temperature
        write(unit,'(a,ES13.6)')  '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
-       write(unit,'(a,ES13.6)')  '  box_size_cm           = ',idealised_model_box_size_cm
     else
        write(*,'(a,a,a)')        '[IdealisedModel]'
        write(*,'(a,ES13.6)')     '  ColumnDensity_cgs     = ',ColumnDensity_cgs
@@ -170,7 +169,6 @@ contains
        write(*,'(a,ES13.6)')     '  Radius_boxUnits       = ',Radius_boxUnits
        write(*,'(a,ES13.6)')     '  Temperature           = ',Temperature
        write(*,'(a,ES13.6)')     '  TurbulentVelocity_kms = ',TurbulentVelocity_kms
-       write(*,'(a,ES13.6)')     '  box_size_cm           = ',idealised_model_box_size_cm
     end if
   end subroutine idealised_model_print_params
 
