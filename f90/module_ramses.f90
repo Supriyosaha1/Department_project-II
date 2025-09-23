@@ -1038,7 +1038,7 @@ contains
     logical(kind=4)                           :: ok
     character(512)                            :: nomfich
     character(128)                            :: orderingtype
-    integer(kind=4)                           :: i, ios
+    integer(kind=4)                           :: i, ios, nboundary, nskipline
     integer(kind=4),parameter                 :: param_unit = 13
     real(qdp)                                 :: delta
     
@@ -1049,10 +1049,23 @@ contains
        stop
     end if
     open(unit=param_unit,file=nomfich,form='unformatted',status='old',action='read',iostat=ios)
-    do i=1,24 ! Assume that there is no "simple boundary"
+    do i=1,5
        read(param_unit,iostat=ios)
        !print*,'ios =',ios,is_iostat_end(ios)
     end do
+    read(param_unit,iostat=ios) nboundary
+    if (nboundary /= 0) then
+       ! simple_boundary case
+       do i=1,21
+          read(param_unit,iostat=ios)
+       end do
+       nskipline = 27 ! for later
+    else
+       do i=1,18 ! no "simple boundary"
+          read(param_unit,iostat=ios)
+       end do
+       nskipline = 24 ! for later
+    endif
     read(param_unit,iostat=ios) orderingtype
     !print*,'ios =',ios
     
@@ -1062,7 +1075,7 @@ contains
           print*,'Reading Hilbert keys in quad precision failed, read them in double precision...'
           close(param_unit)
           open(unit=param_unit,file=nomfich,form='unformatted',status='old',action='read',iostat=ios)
-          do i=1,24 ! Assume that there is no "simple boundary"
+          do i=1,nskipline
              read(param_unit,iostat=ios)
              !print*,'ios =',ios
           end do
@@ -1092,7 +1105,7 @@ contains
           !print*,'Reading Hilbert keys in quad precision failed, read them in double precision...'
           close(param_unit)
           open(unit=param_unit,file=nomfich,form='unformatted',status='old',action='read',iostat=ios)
-          do i=1,24 ! Assume that there is no "simple boundary"
+          do i=1,nskipline
              read(param_unit,iostat=ios)
              !print*,'ios =',ios
           end do
