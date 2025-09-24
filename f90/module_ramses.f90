@@ -1517,11 +1517,14 @@ contains
 
     ! check Photo-heating
     if (read_rt_variables) then
+       print*,'read_rt_variables'
        write(filename,'(a,a,i5.5,a,i5.5,a)') TRIM(repository),'output_',snapnum,'/info_rt_',snapnum,'.txt'
        open(unit=ilun,file=filename,status='old',form='formatted')
        call read_int( ilun, 'nRTvar', nRTvar)
+       print*,'nRTvar =',nRTvar
        nvarH = nvar - nRTvar
        call read_int( ilun, 'nIons', nIons)
+       print*,'nIons  =',nIons
 ! JB: make sure this is OK for non-Harley cases ... 
 !!$       if (nIons .ne. 3) then
 !!$          print*,'nIons has to be 3 with current implementation ... '
@@ -1606,16 +1609,24 @@ contains
       !-------------------------------------------------------------------------
       integer::lun
       character(*)::param_name
-      character(128)::line,tmp
-      integer::value
+      character(128)::line,tmp,tmpv
+      integer::value,i
       !-------------------------------------------------------------------------
       rewind(unit=lun)
       do
          read(lun, '(A128)', end=223) line
-         if(index(line,trim(param_name)) .eq. 1) then
-            read(line,'(A13,I30)') tmp, value
+         i = scan(line,'=')
+         if (i==0 .or. line(1:1)=='#' .or. line(1:1)=='!') cycle  ! skip blank or commented lines
+         tmp   = trim(adjustl(line(:i-1)))
+         tmpv  = trim(adjustl(line(i+1:)))
+         if (trim(tmp) == trim(param_name)) then
+            read(tmpv,*) value
             return
-         endif
+         end if
+         !if(index(line,trim(param_name)) .eq. 1) then
+         !   read(line,'(A14,I30)') tmp, value
+         !   return
+         !endif
       end do
 223   return                        ! eof reached, didn't find the parameter
 
