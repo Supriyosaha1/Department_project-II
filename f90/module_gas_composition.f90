@@ -132,7 +132,7 @@ contains
     ! Get deuterium if needed
     if(DI_present) then
        allocate(ndi(nleaf))
-       call ramses_get_deuterium(repository,snapnum,nleaf,nvar+metal_number,ramses_var,ndi)
+       call ramses_get_ndi(nleaf,nhi,ndi)
     end if
 
     ! For each element, determine if it is hydrogen (or deuterium), or a metallic ion. For metallic ions, the data is stored in ramses_var, from nvar+1 to nvar+metal_number
