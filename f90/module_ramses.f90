@@ -2870,6 +2870,7 @@ contains
     cpuloop: do k=1,ncpu_read
        icpu=cpu_list(k)
        rank = 1
+       imass_was_found=.false.
        !$ rank = OMP_GET_THREAD_NUM()
        iunit=10+rank*2
        write(filename,'(a,a,i5.5,a,i5.5,a,i5.5)') trim(repository), '/output_', snapnum, '/part_', snapnum, '.out', icpu
