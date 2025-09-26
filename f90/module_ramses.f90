@@ -98,6 +98,7 @@ module module_ramses
   public :: get_ngridtot_cpus
   public :: ramses_get_box_size_cm, get_cpu_list, get_cpu_list_periodic, get_ncpu
   public :: ramses_get_velocity_cgs, ramses_get_T_nhi_cgs, ramses_get_metallicity,  ramses_get_nh_cgs, ramses_get_deuterium
+  public :: ramses_get_ndi
   public :: ramses_get_nh_nhi_nhei_nehii_cgs
   public :: ramses_read_stars_in_domain
   public :: read_ramses_params, print_ramses_params, dump_ramses_info
@@ -1453,6 +1454,21 @@ contains
     return
 
   end subroutine ramses_get_deuterium
+
+
+  subroutine ramses_get_ndi(nleaf,nhi,ndi)
+
+    implicit none
+
+    integer(kind=4),intent(in)  :: nleaf
+    real(kind=8),intent(in)     :: nhi(nleaf)
+    real(kind=8),intent(inout)  :: ndi(nleaf)
+
+    ndi(:) = deut2H_nb_ratio * nhi(:)
+
+    return
+
+  end subroutine ramses_get_ndi
 
 
   subroutine ramses_get_metallicity(nleaf,nvar,ramses_var,metallicity)
