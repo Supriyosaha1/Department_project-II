@@ -6,6 +6,7 @@ rascas/f90/rascas-serial
 
 
 # --- Heavy tutorial data (do not track) ---
-rascas/tutorials/RamsesSimulations/RASCAS_DATA/diskSimulation/
-rascas/tutorials/RamsesSimulations/RASCAS_DATA/diskSimulation/output_00018/
-rascas/tutorials/RamsesSimulations/RASCAS_DATA/seds-for-tutorials/
+rascas/tutorials/RamsesSimulations/RASCAS_DATA/*
+
+# Allow keeping empty folder with .gitkeep
+!rascas/tutorials/RamsesSimulations/RASCAS_DATA/.gitkeep
