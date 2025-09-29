@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 # RASCAS
 
@@ -10,3 +11,13 @@ The homepage of the **RASCAS** project is [here](http://rascas.univ-lyon1.fr).
 If you use **RASCAS**, please acknowledge [Michel-Dansac et al. 2020, A&A 635, A154](https://www.aanda.org/articles/aa/abs/2020/03/aa34961-18/aa34961-18.html).
 
 
+=======
+# Department Project II
+
+This project generates intrinsic Lyman-alpha line profiles from RAMSES simulation outputs. Future versions will add support for GADGET simulations.
+
+- Current: RAMSES output support
+- Planned: GADGET output support
+
+Clone the repo and install requirements to get started.
+>>>>>>> 0e096eb80a618beb7008ed96647e3517cbbc54df
