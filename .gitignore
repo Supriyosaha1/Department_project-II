@@ -1,47 +1,11 @@
+# --- Fortran build artifacts (do not track) ---
+rascas/f90/*.o
+rascas/f90/*.mod
+rascas/f90/rascas
+rascas/f90/rascas-serial
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-.DS_Store
-*.dSYM
-
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# sphinx doc
-_build
+# --- Heavy tutorial data (do not track) ---
+rascas/tutorials/RamsesSimulations/RASCAS_DATA/diskSimulation/
+rascas/tutorials/RamsesSimulations/RASCAS_DATA/diskSimulation/output_00018/
+rascas/tutorials/RamsesSimulations/RASCAS_DATA/seds-for-tutorials/

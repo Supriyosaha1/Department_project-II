@@ -1,8 +1,0 @@
-! MgII - 2796.35 line
-! Atomic data, from the NIST database https://physics.nist.gov/PhysRefData/ASD/lines_form.html
-m_ion     = 24.305d0
-name_ion  = MgII
-lambda_cm = 2796.35d-8                   
-A         = 2.60d8
-f         = 0.608d0                 
-n_fluo    = 0
