@@ -1,0 +1,12 @@
+!------------------------------------
+! FeII - 2374.46 Ang line
+! Atomic data from the NIST database https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+!------------------------------------
+m_ion          = 55.845d0
+name_ion       = FeII
+lambda_cm      = 2374.46d-8
+A              = 4.25d7
+f              = 3.59d-2
+n_fluo         = 1
+lambda_fluo_cm = 2396.35d-8
+A_fluo         = 2.59d8

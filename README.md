@@ -1,73 +1,23 @@
+<<<<<<< HEAD
+
+# RASCAS
+
+**RASCAS** (for RAdiative SCattering in Astrophysical Simulations) is a massively parallel code for resonant line transfer in AMR simulations. **RASCAS** has been designed to be easily customisable and to process simulations of arbitrarily large sizes on large supercomputers. **RASCAS** performs radiative transfer on an adaptive mesh with an octree structure using the Monte Carlo technique. **RASCAS** features full MPI parallelization, domain decomposition, adaptive load-balancing, and a standard peeling algorithm to construct mock observations. The radiative transport of resonant line photons through different mixes of species (e.g. HI, SiII, MgII, FeII), including their interaction with dust, is implemented in a modular fashion to allow new transitions to be easily added to the code. **RASCAS** may also be used to propagate photons at any wavelength (e.g. stellar continuum or fluorescent lines).
+
+The homepage of the **RASCAS** project is [here](http://rascas.univ-lyon1.fr). 
+
+**Check out the new [documentation page](http://rascas.git-cral-pages.univ-lyon1.fr/rascas)!** 
+
+If you use **RASCAS**, please acknowledge [Michel-Dansac et al. 2020, A&A 635, A154](https://www.aanda.org/articles/aa/abs/2020/03/aa34961-18/aa34961-18.html).
+
+
+=======
 # Department Project II
 
-🚀 **Welcome to Department Project II!**
+This project generates intrinsic Lyman-alpha line profiles from RAMSES simulation outputs. Future versions will add support for GADGET simulations.
 
-A comprehensive project developed as part of the department curriculum, focusing on innovative problem-solving, coding best practices, and teamwork.
+- Current: RAMSES output support
+- Planned: GADGET output support
 
----
-
-## ✨ Features
-
-- Modular and well-documented codebase
-- Easy-to-follow structure for educational purposes
-- [Add key features specific to your project here]
-- User-friendly interface and clear instructions
-
----
-
-## 🛠️ Technologies Used
-
-- Python 3.x / [Your programming language]
-- [List of frameworks, libraries, or tools used]
-
----
-
-## ⚡ Getting Started
-
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/Supriyosaha1/Department_project-II.git
-   cd Department_project-II
-   ```
-2. **Install requirements**
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. **Run the project**
-   ```bash
-   python main.py
-   ```
-
----
-
-## 🖼️ Screenshots
-
-<!-- Add screenshots or GIFs of your project here -->
-![Screenshot](assets/screenshot.png)
-
----
-
-## 🤝 Contributing
-
-1. Fork this repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-## 📬 Contact
-
-Supriyosaha1 – [Your email]  
-Project Link: https://github.com/Supriyosaha1/Department_project-II
-
----
-
-> _“Great projects begin with passionate minds – thanks for checking out Department Project II!”_
+Clone the repo and install requirements to get started.
+>>>>>>> 0e096eb80a618beb7008ed96647e3517cbbc54df
