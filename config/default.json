@@ -1,0 +1,38 @@
+{
+  "general": {
+    "debug": false,
+    "verbose": true,
+    "parallel": true,
+    "num_threads": 4
+  },
+  "ramses": {
+    "default_unit_system": "cgs",
+    "load_particles": true,
+    "load_amr": true,
+    "max_level": null
+  },
+  "gadget": {
+    "default_unit_system": "gadget",
+    "load_gas": true,
+    "load_dark_matter": true,
+    "load_stars": true
+  },
+  "rascas": {
+    "executable": "rascas",
+    "config_template": "default.cfg",
+    "output_format": "hdf5"
+  },
+  "analysis": {
+    "compute_profiles": true,
+    "compute_spectra": true,
+    "compute_statistics": true,
+    "radial_bins": 50,
+    "mass_bins": 50
+  },
+  "plotting": {
+    "figure_format": "png",
+    "figure_dpi": 300,
+    "figure_size": [10, 8],
+    "style": "seaborn"
+  }
+}
